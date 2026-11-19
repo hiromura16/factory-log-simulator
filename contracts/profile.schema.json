@@ -1,0 +1,326 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "default": "default",
+      "description": "保存用ID。同じIDで保存すると新しい版になります。",
+      "pattern": "^[A-Za-z0-9_-]{1,64}$",
+      "title": "接続ID",
+      "type": "string",
+      "ui_hidden": false
+    },
+    "name": {
+      "default": "既定の公開設定",
+      "description": "公開先・認証・配送先を管理するプロファイルの表示名。",
+      "maxLength": 120,
+      "title": "表示名",
+      "type": "string",
+      "ui_hidden": false
+    },
+    "auth_mode": {
+      "default": "none",
+      "enum": [
+        "none",
+        "basic",
+        "bearer",
+        "api_key"
+      ],
+      "title": "取得APIの認証方式",
+      "type": "string",
+      "description": "noneは取得用APIの認証なし、basicはユーザーとパスワード、bearerはAuthorization: Bearer、api_keyはX-API-Key。管理画面はログイン不要です。",
+      "ui_hidden": false
+    },
+    "username": {
+      "default": "source",
+      "description": "データ取得API専用のBasic認証ユーザー。管理画面はログイン不要です。",
+      "maxLength": 120,
+      "title": "ユーザー名",
+      "type": "string",
+      "ui_hidden": false
+    },
+    "password": {
+      "anyOf": [
+        {
+          "format": "password",
+          "type": "string",
+          "writeOnly": true
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "取得APIのBasic認証パスワード。空欄は同じ認証方式の保存値を維持。暗号化保存し、読み戻しません。",
+      "title": "パスワード",
+      "ui_hidden": false
+    },
+    "token": {
+      "anyOf": [
+        {
+          "format": "password",
+          "type": "string",
+          "writeOnly": true
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "BearerまたはX-API-Keyで受け付ける値。値は暗号化保存し、JSON書き出しには含めません。",
+      "title": "Token",
+      "ui_hidden": false
+    },
+    "allow_writes": {
+      "default": false,
+      "description": "取得APIのPOST/PATCH/DELETEを許可。既定は読み取りのみ。操作するのはこのツールの疑似データです。",
+      "title": "Allow Writes",
+      "type": "boolean",
+      "ui_hidden": true
+    },
+    "opc_enabled": {
+      "default": true,
+      "description": "OPC UAのバイナリーサーバーを公開します。HTTP送信とは異なり、収集側から読まれたり購読されたりする方式です。",
+      "title": "Opc Enabled",
+      "type": "boolean",
+      "ui_hidden": true
+    },
+    "opc_port": {
+      "default": 4840,
+      "description": "コンテナ内のOPC UA待受ポート。ホストへの公開ポートはComposeで設定します。",
+      "maximum": 65535,
+      "minimum": 1024,
+      "title": "Opc Port",
+      "type": "integer",
+      "ui_hidden": true
+    },
+    "namespace_uri": {
+      "default": "urn:factory:equipment:simulator",
+      "description": "NodeIdを識別する名前空間URI。クライアントはnamespace URIからindexを取得してください。",
+      "maxLength": 255,
+      "title": "Namespace Uri",
+      "type": "string",
+      "ui_hidden": true
+    },
+    "opc_auth": {
+      "default": "anonymous",
+      "enum": [
+        "anonymous",
+        "username"
+      ],
+      "title": "OPC UAの認証",
+      "type": "string",
+      "description": "anonymousは匿名読取、usernameは専用ユーザーで認証。username時はSignAndEncryptが必要です。",
+      "ui_hidden": true
+    },
+    "opc_username": {
+      "default": "reader",
+      "description": "OPC UAのユーザー名認証で使用するユーザー。",
+      "maxLength": 120,
+      "title": "Opc Username",
+      "type": "string",
+      "ui_hidden": true
+    },
+    "opc_password": {
+      "anyOf": [
+        {
+          "format": "password",
+          "type": "string",
+          "writeOnly": true
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "OPC UAユーザーのパスワード。ユーザー名認証時はSignAndEncryptを必須にします。",
+      "title": "Opc Password",
+      "ui_hidden": true
+    },
+    "opc_security": {
+      "default": "none",
+      "enum": [
+        "none",
+        "sign_encrypt"
+      ],
+      "title": "OPC UAの通信保護",
+      "type": "string",
+      "description": "noneは署名・暗号化なし。sign_encryptはBasic256Sha256で署名と暗号化。証明書と秘密鍵を配置し、クライアントも対応する証明書で接続します。",
+      "ui_hidden": true
+    },
+    "certificate_file": {
+      "default": "",
+      "description": "connection-files内のサーバー証明書。OPC UAはapplication URI入りのDER/PEM証明書を使用します。",
+      "title": "Certificate File",
+      "type": "string",
+      "ui_hidden": true
+    },
+    "private_key_file": {
+      "default": "",
+      "description": "connection-files内のサーバー秘密鍵。ファイルは権限600で保存します。",
+      "title": "Private Key File",
+      "type": "string",
+      "ui_hidden": true
+    },
+    "trusted_client_certificates": {
+      "description": "SignAndEncryptで信頼するクライアントのleaf証明書。connection-files内のDER/PEMパスを配列で指定。指紋と有効期間を検証します。",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Trusted Client Certificates",
+      "type": "array",
+      "ui_hidden": true
+    },
+    "modbus_enabled": {
+      "default": true,
+      "description": "Modbus TCPサーバーを公開。TCPにはユーザー名・パスワード認証はありません。接続元制限はホストで行います。",
+      "title": "Modbus Enabled",
+      "type": "boolean",
+      "ui_hidden": true
+    },
+    "modbus_port": {
+      "default": 1502,
+      "description": "コンテナ内のModbus TCP待受。非特権ユーザーのため既定は1502です。",
+      "maximum": 65535,
+      "minimum": 1024,
+      "title": "Modbus Port",
+      "type": "integer",
+      "ui_hidden": true
+    },
+    "output": {
+      "default": "capture",
+      "enum": [
+        "capture",
+        "file",
+        "udp",
+        "tcp",
+        "tls"
+      ],
+      "title": "送信・保存方式",
+      "type": "string",
+      "description": "captureは永続記録だけ、fileはローカル回転ログ、udp/tcp/tlsはSyslog。UDP/TCPは受信アプリの処理完了を保証しません。MQTTはQoS1のブローカーACK、HTTPは2xx受付まで。",
+      "ui_hidden": false
+    },
+    "host": {
+      "default": "",
+      "description": "Syslog/MQTT送信先のホスト。http://やポートは含めません。",
+      "maxLength": 255,
+      "title": "ホスト",
+      "type": "string",
+      "ui_hidden": false
+    },
+    "port": {
+      "anyOf": [
+        {
+          "maximum": 65535,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "送信先ポート。未指定はSyslog514/TLS6514、MQTT1883/TLS8883を使用。",
+      "title": "ポート",
+      "ui_hidden": false
+    },
+    "topic": {
+      "default": "factory/identification",
+      "description": "RFID・バーコードイベントをMQTTで配信するトピック。",
+      "maxLength": 255,
+      "title": "配送先トピック / subject / routing key",
+      "type": "string",
+      "ui_hidden": true
+    },
+    "url": {
+      "default": "",
+      "description": "HTTP送信先URL。HTTP APIへ1イベントずつJSONをPOSTします。",
+      "maxLength": 2048,
+      "title": "送信URL",
+      "type": "string",
+      "ui_hidden": true
+    },
+    "output_username": {
+      "default": "",
+      "description": "MQTT送信用のユーザー。取得APIの認証とは別です。",
+      "maxLength": 255,
+      "title": "Output Username",
+      "type": "string",
+      "ui_hidden": true
+    },
+    "mqtt_tls": {
+      "default": false,
+      "description": "MQTT接続でTLSを使用。既定ポートは有効時8883、無効時1883。CAと検証設定も適用します。",
+      "title": "Mqtt Tls",
+      "type": "boolean",
+      "ui_hidden": true
+    },
+    "output_password": {
+      "anyOf": [
+        {
+          "format": "password",
+          "type": "string",
+          "writeOnly": true
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "MQTT送信先パスワード。暗号化して保存します。",
+      "title": "Output Password",
+      "ui_hidden": true
+    },
+    "output_token": {
+      "anyOf": [
+        {
+          "format": "password",
+          "type": "string",
+          "writeOnly": true
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "HTTP送信時のBearerトークン。空欄なら認証ヘッダーを付けません。",
+      "title": "Output Token",
+      "ui_hidden": true
+    },
+    "tls_verify": {
+      "default": true,
+      "description": "送信先のTLS証明書とホスト名を検証。Syslog TLS / HTTPS / MQTT TLSに適用します。",
+      "title": "Tls Verify",
+      "type": "boolean",
+      "ui_hidden": false
+    },
+    "ca_file": {
+      "default": "",
+      "description": "送信先CA証明書。connection-files内のPEM。未指定はシステム信頼ストア。",
+      "title": "Ca File",
+      "type": "string",
+      "ui_hidden": false
+    },
+    "timeout_seconds": {
+      "default": 10,
+      "description": "接続・受信ACKの最大待機秒数。",
+      "maximum": 60,
+      "minimum": 1,
+      "title": "接続・通信タイムアウト 秒",
+      "type": "integer",
+      "ui_hidden": false
+    },
+    "clear_secrets": {
+      "description": "明示的に消す秘密情報名の配列。例: [\"token\"]。空欄による維持と区別します。",
+      "items": {
+        "type": "string"
+      },
+      "title": "削除する保存済み認証情報 JSON",
+      "type": "array",
+      "ui_hidden": false
+    }
+  },
+  "title": "Profile",
+  "type": "object"
+}

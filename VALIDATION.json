@@ -1,0 +1,52 @@
+{
+  "version": "0.1.0",
+  "validated_on": "2026-11-14",
+  "app": "logs",
+  "unit_tests": {
+    "passed": 6
+  },
+  "presets": {
+    "normal": 12,
+    "anomaly": 12,
+    "all_live_previews": "passed"
+  },
+  "live_acceptance": {
+    "status": "running",
+    "produced": 375,
+    "preset_previews": 24,
+    "event_statuses": [
+      "delivered"
+    ],
+    "rotating_file_bytes": 487693
+  },
+  "inline_help": "hover and keyboard focus",
+  "profile_secrets": "encrypted, excluded from exports",
+  "schema_contracts": "contracts/spec.schema.json and contracts/profile.schema.json",
+  "network_scope": "localhost, LAN and Tailscale; user-approved",
+  "not_verified": [
+    "Vendor-specific integrations beyond the documented protocol subset",
+    "Sustained maximum throughput"
+  ],
+  "runtime_dependencies": "uv.lock + hashed requirements.txt",
+  "browser_acceptance": {
+    "desktop_mobile": "passed",
+    "hover_focus_help": "passed",
+    "preset_json_round_trip": "passed",
+    "page_errors": []
+  },
+  "admin_login_required": false,
+  "login_removal_acceptance": {
+    "ui_api_metrics": "no login",
+    "preview_without_credentials": "passed",
+    "cross_origin_mutation_blocked": "passed",
+    "hosts": [
+      "localhost",
+      "LAN",
+      "Tailscale"
+    ],
+    "browser_without_credentials": "passed",
+    "preview": "passed"
+  },
+  "event_sequence_scope": "per dataset; independent new datasets start at zero",
+  "evidence_scope": "Historical acceptance record from the stated validation date; not rerun or newly certified by the sanitized sample publication. Revalidate in the intended deployment environment."
+}

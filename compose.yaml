@@ -1,0 +1,56 @@
+{
+  "services": {
+    "app": {
+      "build": {
+        "context": "."
+      },
+      "image": "factory-log-simulator:local",
+      "restart": "unless-stopped",
+      "read_only": true,
+      "tmpfs": [
+        "/tmp:size=64m"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "mem_limit": "${APP_MEMORY:-512m}",
+      "cpus": "${APP_CPUS:-1.0}",
+      "pids_limit": 128,
+      "stop_grace_period": "60s",
+      "ports": [
+        "${BIND_IP:-127.0.0.1}:${APP_PORT}:8080"
+      ],
+      "environment": {
+        "DATA_DIR": "/data",
+        "MIN_AVAILABLE_GIB": "${MIN_AVAILABLE_GIB:-6}",
+        "AUTO_START": "${AUTO_START:-1}",
+        "LOG_DIR": "/logs"
+      },
+      "volumes": [
+        "app-data:/data",
+        "${LOG_DIR:?Set log directory}:/logs"
+      ],
+      "labels": [
+        "app.owner=factory-source-expansion-v1",
+        "app.component=factory-log-simulator",
+        "traefik.enable=false",
+        "${FACTORY_GUARD_LABEL_PREFIX:-factory}.guard.managed=true",
+        "lab.role=heavy",
+        "lab.stop_priority=65"
+      ],
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    }
+  },
+  "volumes": {
+    "app-data": {}
+  }
+}

@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Factory Source Studio</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <header>
+      <div>
+        <span class="eyebrow">FACTORY SOURCE STUDIO</span>
+        <h1 id="title">データソース模擬</h1>
+        <p>データ定義・公開方法・認証・異常シナリオを自由に。</p>
+      </div>
+      <span id="status" class="badge">読み込み中</span>
+    </header>
+    <div class="layout">
+      <aside>
+        <nav>
+          <button data-tab="generate" class="nav active">01 設定と実行</button
+          ><button data-tab="profiles" class="nav">
+            02 公開・配送プロファイル</button
+          ><button data-tab="json" class="nav">03 JSON / プリセット</button
+          ><button data-tab="monitor" class="nav">04 現在値と取得方法</button>
+        </nav>
+        <div class="aside-note">
+          <span class="eyebrow">CONTEXT HELP</span>
+          <p>
+            項目にマウスを重ねるか、?へキーボードで移動すると説明を表示します。
+          </p>
+          <p id="contextHelp">プリセットを選ぶと想定・確認事項を表示します。</p>
+        </div>
+      </aside>
+      <main>
+        <div id="notice" role="status" aria-live="polite"></div>
+        <section id="generate" class="tab active">
+          <div class="section-head">
+            <h2>設定と実行</h2>
+            <button id="toJson">この設定を保存…</button>
+          </div>
+          <div class="toolbar card">
+            <label>プリセット<select id="presetSelect"></select></label
+            ><button id="loadPreset">読み込む</button>
+          </div>
+          <p id="presetDetails" class="note"></p>
+          <form id="specForm"><div id="editor"></div></form>
+          <div class="actionbar">
+            <button id="preview">プレビュー（書き込みなし）</button
+            ><button id="start" class="primary">この設定で開始</button
+            ><button id="stop" class="danger">停止</button>
+          </div>
+          <p class="muted">
+            実行中の設定は固定します。変更は停止後、開始すると反映されます。停止しても保存済みデータは残ります。
+          </p>
+          <div class="card">
+            <h3>プレビュー / 結果</h3>
+            <div id="previewTable" class="table-scroll"></div>
+            <details>
+              <summary>JSONの詳細</summary>
+              <pre id="result"></pre>
+            </details>
+          </div>
+        </section>
+        <section id="profiles" class="tab">
+          <div class="section-head">
+            <h2>公開・配送・取得用の認証</h2>
+            <button id="newProfile">＋ 新規</button>
+          </div>
+          <p class="intro">
+            このアプリが公開するサーバーと、外部への配送先を設定します。管理画面はログイン不要です。保存後、停止・開始すると適用されます。
+          </p>
+          <div class="toolbar card">
+            <label
+              >保存済みプロファイル<select id="profileSelect"></select></label
+            ><button id="editProfile">読み込む</button>
+          </div>
+          <form id="profileForm" class="card grid"></form>
+          <p id="secretState" class="muted"></p>
+          <div class="actionbar">
+            <button id="saveProfile" class="primary">プロファイルを保存</button
+            ><button id="exportProfile">認証情報なしでJSONを書き出す</button>
+          </div>
+          <details class="card">
+            <summary>証明書・鍵・設定ファイルを配置</summary>
+            <p class="muted">
+              connection-files内へ権限600で保存します。内容は読み戻せません。同じ配置名で更新します。
+            </p>
+            <div class="grid">
+              <label data-help="PEM/DER証明書、秘密鍵、CA証明書等。1MiBまで。"
+                >ファイル<input id="certFile" type="file" /></label
+              ><label
+                data-help="connection-filesからの相対パス。例: server.der、server-key.pem。"
+                >配置名<input id="certName" placeholder="server.der"
+              /></label>
+            </div>
+            <button id="uploadFile">配置</button>
+          </details>
+        </section>
+        <section id="json" class="tab">
+          <h2>プリセットJSON</h2>
+          <div class="card">
+            <label
+              data-help="保存するID。英数字・ハイフン・下線。同じIDは更新します。"
+              >プリセットID<input id="presetId" value="my-preset" /></label
+            ><label
+              >JSONファイルを読み込む<input
+                id="importJson"
+                type="file"
+                accept=".json,application/json" /></label
+            ><label
+              data-help="生成条件と設定を完全なJSONで編集。認証情報は別のプロファイルに保存します。"
+              >設定JSON<textarea
+                id="jsonText"
+                rows="28"
+                spellcheck="false"
+                class="code"
+              ></textarea>
+            </label>
+            <div class="actionbar">
+              <button id="applyJson">JSONを画面へ反映</button
+              ><button id="savePreset" class="primary">
+                プリセットとして保存</button
+              ><button id="exportJson">JSONを書き出す</button>
+            </div>
+          </div>
+        </section>
+        <section id="monitor" class="tab">
+          <h2>現在値と取得方法</h2>
+          <div class="card">
+            <h3>公開インターフェース</h3>
+            <pre id="interfaces"></pre>
+            <p class="muted">
+              HOSTとPORTはホスト側の公開アドレスに置き換えてください。取得用の認証はプロファイルで選択できます。
+            </p>
+          </div>
+          <div class="card">
+            <h3>最近のデータ</h3>
+            <div id="currentTable" class="table-scroll"></div>
+          </div>
+          <details class="card">
+            <summary>状態の詳細</summary>
+            <pre id="stateJson"></pre>
+          </details>
+        </section>
+      </main>
+    </div>
+    <div id="tooltip" role="tooltip" hidden></div>
+    <footer>
+      設定・認証・プリセット・データはこのアプリの永続領域に保存します。
+    </footer>
+  </body>
+</html>
