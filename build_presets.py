@@ -1,4 +1,4 @@
-"""Credential-free starter and fault presets for the pull/push source studios."""
+"""資格情報を含まない初期設定と障害再現プリセットを生成する。"""
 
 from pathlib import Path
 from config import FieldRule, AnomalyRule
@@ -6,12 +6,17 @@ from models import Spec, Resource, Register
 
 
 def business_fields(name):
-    key = FieldRule(name="id", generator="record_id", primary_key=True, length=64)
+    """業務リソースの種類に応じた項目定義を生成する。"""
+    key = FieldRule(
+        name="id", generator="record_id", primary_key=True, length=64
+    )
     if name == "inventory":
         return [
             key,
             FieldRule(
-                name="item_id", generator="template", template="ITEM-{sequence:06d}"
+                name="item_id",
+                generator="template",
+                template="ITEM-{sequence:06d}",
             ),
             FieldRule(
                 name="on_hand",
@@ -36,7 +41,9 @@ def business_fields(name):
         ]
     return [
         key,
-        FieldRule(name="order_no", generator="template", template="WO-{sequence:08d}"),
+        FieldRule(
+            name="order_no", generator="template", template="WO-{sequence:08d}"
+        ),
         FieldRule(
             name="quantity",
             data_type="integer",
@@ -67,6 +74,10 @@ def business_fields(name):
 
 
 def build(kind, path):
+    """指定した種類の入門・負荷・障害プリセットを組み立て、JSONとして出力する。
+
+    開発用の生成処理であり、既存プリセットを書き換えるため実行先を確認する。
+    """
     values = {}
     names = {
         "equipment": [
@@ -247,7 +258,9 @@ def build(kind, path):
                     )
                 )
                 spec.equipment.registers.append(
-                    Register(field="active", area="coil", encoding="bool", address=0)
+                    Register(
+                        field="active", area="coil", encoding="bool", address=0
+                    )
                 )
             if i == 8:
                 spec.equipment.registers[0].area = "input"
@@ -259,7 +272,13 @@ def build(kind, path):
                 spec.generator.fields[5].name = "temperature"
                 spec.equipment.registers[0].field = "temperature"
             if i in {12, 13, 14, 15, 16}:
-                op = {12: "set", 13: "ramp", 14: "freeze", 15: "null", 16: "set"}[i]
+                op = {
+                    12: "set",
+                    13: "ramp",
+                    14: "freeze",
+                    15: "null",
+                    16: "set",
+                }[i]
                 v = {12: 250, 13: 1, 14: None, 15: None, 16: "SENSOR_ERROR"}[i]
                 spec.generator.anomalies = [
                     AnomalyRule(
@@ -273,7 +292,9 @@ def build(kind, path):
                 ]
             if i in {17, 18}:
                 spec.equipment.quality = (
-                    "BadSensorFailure" if i == 17 else "UncertainLastUsableValue"
+                    "BadSensorFailure"
+                    if i == 17
+                    else "UncertainLastUsableValue"
                 )
                 spec.equipment.quality_from_tick = 5
                 spec.equipment.quality_until_tick = 10
@@ -335,7 +356,9 @@ def build(kind, path):
                 spec.business.fault_every = 3
             if i == 20:
                 spec.generator.anomalies = [
-                    AnomalyRule(field="on_hand", value=-10, from_row=20, to_row=39)
+                    AnomalyRule(
+                        field="on_hand", value=-10, from_row=20, to_row=39
+                    )
                 ]
             if i == 21:
                 spec.generator.anomalies = [
@@ -349,12 +372,17 @@ def build(kind, path):
                 ]
             if i == 22:
                 spec.generator.anomalies = [
-                    AnomalyRule(field="status", value="UNKNOWN", from_row=20, to_row=39)
+                    AnomalyRule(
+                        field="status", value="UNKNOWN", from_row=20, to_row=39
+                    )
                 ]
             if i == 23:
                 spec.generator.anomalies = [
                     AnomalyRule(
-                        field="quantity", operation="omit", from_row=20, to_row=39
+                        field="quantity",
+                        operation="omit",
+                        from_row=20,
+                        to_row=39,
                     )
                 ]
         elif kind == "historian":
@@ -400,12 +428,16 @@ def build(kind, path):
                 spec.history.bad_every = 3
             if i in {15, 16}:
                 spec.history.shift_every = 5
-                spec.history.timestamp_shift_seconds = -120 if i == 15 else 86400
+                spec.history.timestamp_shift_seconds = (
+                    -120 if i == 15 else 86400
+                )
             if 17 <= i <= 21:
                 spec.generator.anomalies = [
                     AnomalyRule(
                         field="value",
-                        operation=["set", "ramp", "freeze", "null", "set"][i - 17],
+                        operation=["set", "ramp", "freeze", "null", "set"][
+                            i - 17
+                        ],
                         value=[250, 1, None, None, "BAD"][i - 17],
                         from_row=20,
                         to_row=100,
@@ -430,9 +462,7 @@ def build(kind, path):
                 spec.logs.rotate_mb = 1
                 spec.logs.backups = 3
             if i == 10:
-                spec.logs.message_template = (
-                    "source={entity_id} sequence={sequence_no} measurement={value}"
-                )
+                spec.logs.message_template = "source={entity_id} sequence={sequence_no} measurement={value}"
             if i in {11, 19}:
                 spec.logs.message_template = (
                     "設備={entity_id} 状態={status} 測定値={value}\n検証ログ"
@@ -443,14 +473,18 @@ def build(kind, path):
                 spec.logs.malformed_every = 3
             if i == 15:
                 spec.generator.anomalies = [
-                    AnomalyRule(field="value", value="ERROR", bypass_validation=True)
+                    AnomalyRule(
+                        field="value", value="ERROR", bypass_validation=True
+                    )
                 ]
             if i == 18:
                 spec.generator.anomalies = [
                     AnomalyRule(field="value", operation="freeze")
                 ]
             if i == 20:
-                spec.logs.message_template = ("large-message " * 200) + "{sequence}"
+                spec.logs.message_template = (
+                    "large-message " * 200
+                ) + "{sequence}"
             if i == 21:
                 spec.generator.anomalies = [
                     AnomalyRule(field="value", operation="null")
@@ -502,7 +536,9 @@ def build(kind, path):
                 spec.interval_ms = 100
             if i == 19:
                 spec.generator.fields.append(
-                    FieldRule(name="tag_id", generator="constant", value="STUCK-TAG")
+                    FieldRule(
+                        name="tag_id", generator="constant", value="STUCK-TAG"
+                    )
                 )
             if i == 20:
                 spec.generator.anomalies = [
@@ -518,7 +554,9 @@ def build(kind, path):
         if kind == "api" and i == 10:
             spec.generator.fields.append(
                 FieldRule(
-                    name="line_id", generator="choice", choices=["LINE-A", "LINE-B"]
+                    name="line_id",
+                    generator="choice",
+                    choices=["LINE-A", "LINE-B"],
                 )
             )
         if kind == "identification" and i == 11:
@@ -569,14 +607,18 @@ def build(kind, path):
                     f"tick {o.offline_from_tick}から{o.offline_ticks}tickの間、両リスナーを停止して再開。"
                 ]
             if o.read_delay_ms:
-                conditions += [f"Modbusアクセスへ{o.read_delay_ms}msの応答遅延を追加。"]
+                conditions += [
+                    f"Modbusアクセスへ{o.read_delay_ms}msの応答遅延を追加。"
+                ]
             checks = [
                 "OPC UAは値・StatusCode・購読通知、Modbusは領域・レジスター幅・符号・倍率・順序を照合。",
                 "書き込み許可時も次の生成tickで値を更新。数値の桁あふれはModbusのエラー応答を確認。",
             ]
         elif kind == "api":
             o = spec.business
-            conditions += [f"{x.name}を{x.rows}件で初期化。" for x in o.resources]
+            conditions += [
+                f"{x.name}を{x.rows}件で初期化。" for x in o.resources
+            ]
             conditions += [
                 f"1tickごとに各コレクション最大{o.updates_per_tick}件を更新。既定ページ{o.page_size}件、カーソル寿命{o.cursor_ttl_seconds}秒。"
             ]
@@ -602,7 +644,9 @@ def build(kind, path):
                     f"{o.missing_every}時点ごとのサンプルを保存せず欠測にする。"
                 ]
             if o.bad_every:
-                conditions += [f"{o.bad_every}時点ごとに品質{o.quality}を記録。"]
+                conditions += [
+                    f"{o.bad_every}時点ごとに品質{o.quality}を記録。"
+                ]
             if o.shift_every:
                 conditions += [
                     f"{o.shift_every}時点ごとに時刻を{o.timestamp_shift_seconds}秒ずらす。元の時刻軸からの単発シフト。"
@@ -622,7 +666,9 @@ def build(kind, path):
                     f"{o.duplicate_every}件ごとに同じevent_idと本文を重複出力。"
                 ]
             if o.malformed_every:
-                conditions += [f"{o.malformed_every}件ごとにヘッダーを意図的に破損。"]
+                conditions += [
+                    f"{o.malformed_every}件ごとにヘッダーを意図的に破損。"
+                ]
             checks = [
                 "PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。",
                 "TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。",
@@ -666,7 +712,9 @@ def build(kind, path):
     path = Path(path)
     path.mkdir(exist_ok=True)
     for identity, spec in values.items():
-        (path / (identity + ".json")).write_text(spec.model_dump_json(indent=2) + "\n")
+        (path / (identity + ".json")).write_text(
+            spec.model_dump_json(indent=2) + "\n"
+        )
     return values
 
 

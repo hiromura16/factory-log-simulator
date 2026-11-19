@@ -1,4 +1,7 @@
-"""Snapshot/delta REST, an explicit OData query subset, and historian reads."""
+"""スナップショット・差分・履歴を取得するAPIと限定的なOData構文を提供する。
+
+ルートの説明はコメントに置き、OpenAPIの既存descriptionを変えない。
+"""
 
 import asyncio
 import hashlib
@@ -14,6 +17,7 @@ IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}$")
 
 
 def timestamp(value):
+    """タイムゾーン付きISO日時を秒へ変換し、未指定ならNoneを返す。"""
     if value is None:
         return None
     dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -23,6 +27,10 @@ def timestamp(value):
 
 
 def predicate(text, fields):
+    """比較・括弧・and/orの限定構文をSQL条件とバインド値へ変換する。
+
+    許可フィールド・演算子だけを使い、入力値をSQL文字列へ直接埋め込まない。
+    """
     if not text:
         return "1", []
     if len(text) > 2000:
@@ -44,6 +52,7 @@ def predicate(text, fields):
     args = []
 
     def atom():
+        """比較一つまたは括弧内の式を解釈し、型付き値をバインド引数へ追加する。"""
         nonlocal index
         if index >= len(tokens):
             raise ValueError("filterが不完全です")
@@ -80,7 +89,9 @@ def predicate(text, fields):
         if value.lower() == "null":
             if op.lower() not in {"eq", "ne"}:
                 raise ValueError("NULLはeq/neで比較してください")
-            return column + (" IS NULL" if op.lower() == "eq" else " IS NOT NULL")
+            return column + (
+                " IS NULL" if op.lower() == "eq" else " IS NOT NULL"
+            )
         if value.startswith("'"):
             parsed = value[1:-1].replace("''", "'")
         elif value.lower() in {"true", "false"}:
@@ -89,11 +100,14 @@ def predicate(text, fields):
             try:
                 parsed = float(value) if "." in value else int(value)
             except ValueError:
-                raise ValueError("文字列リテラルは単一引用符で囲んでください") from None
+                raise ValueError(
+                    "文字列リテラルは単一引用符で囲んでください"
+                ) from None
         args.append(parsed)
         return column + operator + "?"
 
     def conjunction():
+        """and結合を先に解析し、orより高い優先順位を保つ。"""
         nonlocal index
         sql = atom()
         while index < len(tokens) and tokens[index].lower() == "and":
@@ -102,6 +116,7 @@ def predicate(text, fields):
         return sql
 
     def expr():
+        """andでまとめた条件をorで結び、現在位置を進める。"""
         nonlocal index
         sql = conjunction()
         while index < len(tokens) and tokens[index].lower() == "or":
@@ -116,7 +131,10 @@ def predicate(text, fields):
 
 
 def register_data_routes(app, c, authorize):
+    """業務・履歴取得の共通ルートを登録し、同じ認証関数と保存領域を使う。"""
+
     def resource(name):
+        """設定された名前のコレクションを取得し、不明な名前は404とする。"""
         opts = c.source_spec().business
         for item in opts.resources:
             if item.name == name:
@@ -124,6 +142,7 @@ def register_data_routes(app, c, authorize):
         raise HTTPException(404, "コレクションがありません")
 
     def ready(request):
+        """取得認証を確認し、データセット準備中なら再試行可能な503で返す。"""
         authorize(request)
         if not c.ds or c.status == "starting":
             raise HTTPException(
@@ -131,23 +150,29 @@ def register_data_routes(app, c, authorize):
             )
 
     async def fault():
+        """要求数を進め、指定周期にHTTP障害または遅延を模擬する。"""
         c.requests += 1
         opts = c.source_spec().business
         if opts.fault == "none" or c.requests % opts.fault_every:
             return None
         if opts.fault == "rate_limit":
             return JSONResponse(
-                {"error": "simulated_rate_limit"}, 429, headers={"Retry-After": "2"}
+                {"error": "simulated_rate_limit"},
+                429,
+                headers={"Retry-After": "2"},
             )
         if opts.fault == "server_error":
             return JSONResponse({"error": "simulated_server_error"}, 503)
         if opts.fault == "unauthorized":
-            return JSONResponse({"error": "simulated_expired_credentials"}, 401)
+            return JSONResponse(
+                {"error": "simulated_expired_credentials"}, 401
+            )
         if opts.fault == "delay":
             await asyncio.sleep(opts.fault_delay_ms / 1000)
         return opts.fault
 
     def token_data(token):
+        """カーソルの期限切れを410、不正形式を400へ変換する。"""
         try:
             return c.store.untoken(token)
         except TimeoutError as e:
@@ -156,17 +181,28 @@ def register_data_routes(app, c, authorize):
             raise HTTPException(400, str(e)) from None
 
     async def collection(request, name, odata=False):
+        """検索条件を固定したスナップショットをページ化して返す。
+
+        カーソルに対象と条件を束縛し、RESTと限定ODataの表現差だけを切り替える。
+        """
         ready(request)
         res = resource(name)
         g = res.generator or c.source_spec().generator
-        fields = {f.name for f in g.fields} | {"id", "_revision", "_updated_at"}
+        fields = {f.name for f in g.fields} | {
+            "id",
+            "_revision",
+            "_updated_at",
+        }
         injection = await fault()
         if isinstance(injection, Response):
             return injection
         q = request.query_params
         try:
             limit = int(
-                q.get("$top" if odata else "limit", c.source_spec().business.page_size)
+                q.get(
+                    "$top" if odata else "limit",
+                    c.source_spec().business.page_size,
+                )
             )
             if not 1 <= limit <= 1000:
                 raise ValueError("ページ件数は1〜1000です")
@@ -184,7 +220,10 @@ def register_data_routes(app, c, authorize):
                 if (
                     field not in fields
                     or len(parts) > 2
-                    or (len(parts) == 2 and parts[1].lower() not in {"asc", "desc"})
+                    or (
+                        len(parts) == 2
+                        and parts[1].lower() not in {"asc", "desc"}
+                    )
                 ):
                     raise ValueError("orderbyを確認してください")
                 column = (
@@ -197,7 +236,9 @@ def register_data_routes(app, c, authorize):
                     else "json_extract(payload,'$." + field + "')"
                 )
                 ordering.append(
-                    column + " " + (parts[1].upper() if len(parts) == 2 else "ASC")
+                    column
+                    + " "
+                    + (parts[1].upper() if len(parts) == 2 else "ASC")
                 )
             ordering.append("id ASC")
             selected = selection.split(",") if selection else []
@@ -219,7 +260,9 @@ def register_data_routes(app, c, authorize):
                 or d.get("res") != name
                 or d.get("query") != signature
             ):
-                raise HTTPException(409, "カーソルのデータセット・条件が一致しません")
+                raise HTTPException(
+                    409, "カーソルのデータセット・条件が一致しません"
+                )
             offset, snapshot = d["offset"], d["snapshot"]
         if injection == "duplicate_page":
             offset = max(0, offset - limit)
@@ -232,7 +275,8 @@ def register_data_routes(app, c, authorize):
         )
         with c.store.db() as db:
             total = db.execute(
-                "SELECT count(*) FROM (" + base + ")", [c.ds, name, snapshot, *args]
+                "SELECT count(*) FROM (" + base + ")",
+                [c.ds, name, snapshot, *args],
             ).fetchone()[0]
             rows = db.execute(
                 base + " ORDER BY " + ",".join(ordering) + " LIMIT ? OFFSET ?",
@@ -245,10 +289,18 @@ def register_data_routes(app, c, authorize):
                 "_revision": r["rev"],
                 "_updated_at": r["changed_at"],
             }
-            values.append({k: value.get(k) for k in selected} if selected else value)
+            values.append(
+                {k: value.get(k) for k in selected} if selected else value
+            )
         exp = time.time() + c.source_spec().business.cursor_ttl_seconds
         delta = c.store.token(
-            {"ds": c.ds, "res": name, "rev": snapshot, "exp": exp, "type": "delta"}
+            {
+                "ds": c.ds,
+                "res": name,
+                "rev": snapshot,
+                "exp": exp,
+                "type": "delta",
+            }
         )
         result = {
             "value": values,
@@ -283,19 +335,25 @@ def register_data_routes(app, c, authorize):
             )
         if odata:
             result["@odata.context"] = (
-                str(request.base_url).rstrip("/") + "/source/odata/$metadata#" + name
+                str(request.base_url).rstrip("/")
+                + "/source/odata/$metadata#"
+                + name
             )
         if injection == "truncate_json":
             return Response(
                 json.dumps(result)[: max(1, len(json.dumps(result)) // 2)],
                 media_type="application/json",
             )
-        return JSONResponse(result, headers={"OData-Version": "4.0"} if odata else {})
+        return JSONResponse(
+            result, headers={"OData-Version": "4.0"} if odata else {}
+        )
 
+    # 共通の一覧処理をREST形式で呼び出す。
     @app.get("/source/rest/{name}")
     async def rest(request: Request, name: str):
         return await collection(request, name)
 
+    # 設定されたコレクションと型のODataメタ情報をXMLで返す。
     @app.get("/source/odata/$metadata")
     def metadata(request: Request):
         ready(request)
@@ -320,7 +378,9 @@ def register_data_routes(app, c, authorize):
                 for f in fields
             )
             if not any(f.name == "id" for f in fields):
-                props += '<Property Name="id" Type="Edm.String" Nullable="false"/>'
+                props += (
+                    '<Property Name="id" Type="Edm.String" Nullable="false"/>'
+                )
             items.append(
                 '<EntityType Name="'
                 + res.name
@@ -329,7 +389,11 @@ def register_data_routes(app, c, authorize):
                 + "</EntityType>"
             )
         sets = "".join(
-            '<EntitySet Name="' + r.name + '" EntityType="Factory.' + r.name + '"/>'
+            '<EntitySet Name="'
+            + r.name
+            + '" EntityType="Factory.'
+            + r.name
+            + '"/>'
             for r in c.source_spec().business.resources
         )
         return Response(
@@ -341,10 +405,12 @@ def register_data_routes(app, c, authorize):
             media_type="application/xml",
         )
 
+    # 共通の一覧処理を対応範囲のOData形式で呼び出す。
     @app.get("/source/odata/{name}")
     async def odata(request: Request, name: str):
         return await collection(request, name, True)
 
+    # 署名カーソルの対象を検証し、上限リビジョンまでの変更・削除をページ化する。
     @app.get("/source/rest/{name}/delta")
     def delta(request: Request, name: str, token: str, limit: int = 100):
         ready(request)
@@ -352,7 +418,11 @@ def register_data_routes(app, c, authorize):
         if not 1 <= limit <= 1000:
             raise HTTPException(422, "limitは1〜1000")
         d = token_data(token)
-        if d.get("ds") != c.ds or d.get("res") != name or d.get("type") != "delta":
+        if (
+            d.get("ds") != c.ds
+            or d.get("res") != name
+            or d.get("type") != "delta"
+        ):
             raise HTTPException(409, "deltaの対象が一致しません")
         upper = d.get("upper", c.store.maximum(c.ds, name))
         lower = d["rev"]
@@ -362,7 +432,11 @@ def register_data_routes(app, c, authorize):
                 (c.ds, name, lower, upper, limit + 1),
             ).fetchall()
         values = [
-            {"id": r["id"], "@removed": {"reason": "deleted"}, "_revision": r["rev"]}
+            {
+                "id": r["id"],
+                "@removed": {"reason": "deleted"},
+                "_revision": r["rev"],
+            }
             if r["deleted"]
             else {
                 **json.loads(r["payload"]),
@@ -389,7 +463,10 @@ def register_data_routes(app, c, authorize):
         )
         return {"value": values, "next" if more else "delta": link}
 
-    @app.api_route("/source/rest/{name}/{identity}", methods=["GET", "PATCH", "DELETE"])
+    # 一件の取得・更新・削除を処理し、書込許可とETag条件を確認する。
+    @app.api_route(
+        "/source/rest/{name}/{identity}", methods=["GET", "PATCH", "DELETE"]
+    )
     async def single(request: Request, name: str, identity: str):
         ready(request)
         resource(name)
@@ -424,6 +501,7 @@ def register_data_routes(app, c, authorize):
         c.store.put(c.ds, name, [value])
         return Response(status_code=204)
 
+    # 書込許可と文字列IDを検証し、重複していない行を変更履歴へ追加する。
     @app.post("/source/rest/{name}")
     async def insert(request: Request, name: str):
         ready(request)
@@ -443,6 +521,7 @@ def register_data_routes(app, c, authorize):
         c.store.put(c.ds, name, [value])
         return JSONResponse(value, status_code=201)
 
+    # 現在のデータセットに保存されたタグ名を重複なしで返す。
     @app.get("/source/history/tags")
     def tags(request: Request):
         ready(request)
@@ -457,6 +536,7 @@ def register_data_routes(app, c, authorize):
                 ]
             }
 
+    # 時刻・品質条件と署名カーソルを使って生の履歴を安定順で返す。
     @app.get("/source/history/raw")
     def raw(
         request: Request,
@@ -499,12 +579,16 @@ def register_data_routes(app, c, authorize):
             args.extend([d["ts"], d["seq"]])
         with c.store.db() as db:
             rows = db.execute(
-                "SELECT * FROM samples WHERE " + where + " ORDER BY ts,seq LIMIT ?",
+                "SELECT * FROM samples WHERE "
+                + where
+                + " ORDER BY ts,seq LIMIT ?",
                 [*args, limit + 1],
             ).fetchall()
         values = [
             {
-                "timestamp": datetime.fromtimestamp(r["ts"], timezone.utc).isoformat(),
+                "timestamp": datetime.fromtimestamp(
+                    r["ts"], timezone.utc
+                ).isoformat(),
                 "value": json.loads(r["value"]),
                 "quality": r["quality"],
                 "sequence": r["seq"],
@@ -524,9 +608,12 @@ def register_data_routes(app, c, authorize):
                     "exp": time.time() + 600,
                 }
             )
-            result["next"] = str(request.url).split("?", 1)[0] + "?" + urlencode(params)
+            result["next"] = (
+                str(request.url).split("?", 1)[0] + "?" + urlencode(params)
+            )
         return result
 
+    # 期間を有界な区間へ分け、許可した集計方法と欠測補完で履歴を返す。
     @app.get("/source/history/aggregate")
     def aggregate(
         request: Request,
@@ -552,7 +639,11 @@ def register_data_routes(app, c, authorize):
             lo, hi = timestamp(start), timestamp(end)
         except ValueError as e:
             raise HTTPException(422, str(e)) from None
-        if lo > hi or interval_seconds < 1 or (hi - lo) / interval_seconds > 10000:
+        if (
+            lo > hi
+            or interval_seconds < 1
+            or (hi - lo) / interval_seconds > 10000
+        ):
             raise HTTPException(422, "期間・間隔は1万区間以下にしてください")
         where = "ds=? AND tag=? AND ts>=? AND ts<=?" + (
             " AND quality='Good'" if good_only else ""
@@ -573,7 +664,16 @@ def register_data_routes(app, c, authorize):
                     "SELECT bucket,value FROM (SELECT CAST((ts-?)/? AS INTEGER) bucket,value,row_number() OVER(PARTITION BY CAST((ts-?)/? AS INTEGER) ORDER BY ts DESC,seq DESC) rn FROM samples WHERE "
                     + where
                     + ") WHERE rn=1 ORDER BY bucket",
-                    [lo, interval_seconds, lo, interval_seconds, c.ds, tag, lo, hi],
+                    [
+                        lo,
+                        interval_seconds,
+                        lo,
+                        interval_seconds,
+                        c.ds,
+                        tag,
+                        lo,
+                        hi,
+                    ],
                 ).fetchall()
             else:
                 rows = db.execute(
@@ -585,7 +685,9 @@ def register_data_routes(app, c, authorize):
                     [lo, interval_seconds, c.ds, tag, lo, hi],
                 ).fetchall()
         points = {
-            r["bucket"]: json.loads(r["value"]) if function == "last" else r["value"]
+            r["bucket"]: json.loads(r["value"])
+            if function == "last"
+            else r["value"]
             for r in rows
         }
         values = []

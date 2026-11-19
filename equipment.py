@@ -1,4 +1,4 @@
-"""Real OPC UA and Modbus TCP servers, driven by one deterministic equipment model."""
+"""同じ生成モデルをOPC UAノードとModbusレジスターへ反映する。"""
 
 import asyncio
 import json
@@ -10,6 +10,10 @@ from connection_security import connection_file
 
 
 def encode_register(value, mapping):
+    """列挙値・倍率・オフセットを反映し、指定バイト順のレジスター値へ変換する。
+
+    欠測や未登録の列挙値を拒否する。整数範囲外はstructの変換エラーとなる。
+    """
     if mapping.enum_values:
         value = mapping.enum_values.get(str(value))
     if value is None:
@@ -36,7 +40,10 @@ def encode_register(value, mapping):
 
 
 class EquipmentDriver:
+    """生成した設備状態をOPC UAとModbus TCPの両方へ公開する。"""
+
     def __init__(self, c):
+        """接続とノード状態、同一tick内の書込上書き値を初期化する。"""
         self.c = c
         self.opc = None
         self.modbus = None
@@ -47,11 +54,16 @@ class EquipmentDriver:
         self.overrides = {}
 
     async def start(self):
+        """各設備の初期行を生成した後、有効なプロトコルサーバーを開く。"""
         for device in range(1, self.c.spec.equipment.devices + 1):
             self.values[device] = self.c.record(device - 1)
         await self.open()
 
     async def open(self):
+        """設定された認証・証明書・レジスター対応でサーバーを起動する。
+
+        暗号化OPC UAは証明書と信頼リストを要求する。ライブラリ読込とbindはここで行う。
+        """
         from asyncua import Server, ua
         from asyncua.server.user_managers import User, UserRole
         from pymodbus.server import ModbusTcpServer
@@ -62,9 +74,16 @@ class EquipmentDriver:
         if p.opc_enabled:
 
             class Manager:
+                """OPC UAの認証方式に従って利用者のロールを返す。"""
+
                 def get_user(
-                    self, iserver, username=None, password=None, certificate=None
+                    self,
+                    iserver,
+                    username=None,
+                    password=None,
+                    certificate=None,
                 ):
+                    """匿名または設定済みの資格情報を検証し、不一致の場合は利用者を返さない。"""
                     if p.opc_auth == "anonymous" and not username:
                         return User(role=UserRole.User)
                     import hmac
@@ -87,18 +106,28 @@ class EquipmentDriver:
             server.set_server_name("Factory Equipment Simulator")
             if p.opc_security == "sign_encrypt":
                 if not p.certificate_file or not p.private_key_file:
-                    raise ValueError("OPC UAの証明書と秘密鍵を配置してください")
-                await server.load_certificate(connection_file(p.certificate_file))
-                await server.load_private_key(connection_file(p.private_key_file))
+                    raise ValueError(
+                        "OPC UAの証明書と秘密鍵を配置してください"
+                    )
+                await server.load_certificate(
+                    connection_file(p.certificate_file)
+                )
+                await server.load_private_key(
+                    connection_file(p.private_key_file)
+                )
                 from cryptography import x509
                 from cryptography.hazmat.primitives import hashes
 
                 if not p.trusted_client_certificates:
-                    raise ValueError("信頼するクライアント証明書を指定してください")
+                    raise ValueError(
+                        "信頼するクライアント証明書を指定してください"
+                    )
                 trusted = set()
                 for path in p.trusted_client_certificates:
                     data = (
-                        __import__("pathlib").Path(connection_file(path)).read_bytes()
+                        __import__("pathlib")
+                        .Path(connection_file(path))
+                        .read_bytes()
                     )
                     cert = (
                         x509.load_pem_x509_certificate(data)
@@ -108,12 +137,17 @@ class EquipmentDriver:
                     trusted.add(cert.fingerprint(hashes.SHA256()))
 
                 async def validate_certificate(cert, application):
+                    """証明書の指紋と有効期間を検証し、未信頼または期限外なら接続を拒否する。"""
                     if cert.fingerprint(hashes.SHA256()) not in trusted:
                         raise ua.UaStatusCodeError(
                             ua.StatusCodes.BadCertificateUntrusted
                         )
                     now = datetime.now(timezone.utc)
-                    if not cert.not_valid_before_utc <= now <= cert.not_valid_after_utc:
+                    if (
+                        not cert.not_valid_before_utc
+                        <= now
+                        <= cert.not_valid_after_utc
+                    ):
                         raise ua.UaStatusCodeError(
                             ua.StatusCodes.BadCertificateTimeInvalid
                         )
@@ -133,13 +167,16 @@ class EquipmentDriver:
             self.nodes = {}
             for device, row in self.values.items():
                 obj = await server.nodes.objects.add_object(
-                    ua.NodeId(f"Device{device:03d}", namespace), f"Device{device:03d}"
+                    ua.NodeId(f"Device{device:03d}", namespace),
+                    f"Device{device:03d}",
                 )
                 for field in self.c.spec.generator.fields:
                     value = row.get(field.name)
                     variant = self.variant(field, value)
                     node = await obj.add_variable(
-                        ua.NodeId(f"Device{device:03d}.{field.name}", namespace),
+                        ua.NodeId(
+                            f"Device{device:03d}.{field.name}", namespace
+                        ),
                         field.name,
                         variant,
                     )
@@ -186,7 +223,9 @@ class EquipmentDriver:
                         or [
                             SimData(
                                 65535,
-                                values=False if area in {"coil", "discrete"} else 0,
+                                values=False
+                                if area in {"coil", "discrete"}
+                                else 0,
                                 datatype=DataType.BITS
                                 if area in {"coil", "discrete"}
                                 else DataType.REGISTERS,
@@ -201,16 +240,24 @@ class EquipmentDriver:
                         action=partial(self.access, device),
                     )
                 )
-            self.modbus = ModbusTcpServer(devices, address=("0.0.0.0", p.modbus_port))
+            self.modbus = ModbusTcpServer(
+                devices, address=("0.0.0.0", p.modbus_port)
+            )
             await self.modbus.serve_forever(background=True)
             self.information["modbus"] = {
-                "port": int(os.environ.get("PUBLIC_MODBUS_PORT", p.modbus_port)),
+                "port": int(
+                    os.environ.get("PUBLIC_MODBUS_PORT", p.modbus_port)
+                ),
                 "device_ids": list(self.values),
                 "address_base": 0,
                 "mappings": [m.model_dump() for m in options.registers],
             }
 
     def variant(self, field, value):
+        """生成型をUA Variantへ変換し、欠測値には型に合う代替値を使う。
+
+        欠測の品質コードは呼出側が別途付与する。
+        """
         from asyncua import ua
 
         types = {
@@ -242,6 +289,10 @@ class EquipmentDriver:
     async def access(
         self, device, code, start, address, count, registers, write_values
     ):
+        """Modbusの読取・書込要求へ生成値と同一tick内の上書きを反映する。
+
+        書込禁止時はILLEGAL_FUNCTION、値の変換失敗はDEVICE_FAILUREで応答する。
+        """
         from pymodbus.constants import ExcCodes
 
         options = self.c.spec.equipment
@@ -259,7 +310,10 @@ class EquipmentDriver:
         if write_values is not None:
             if not options.writable:
                 return ExcCodes.ILLEGAL_FUNCTION
-            self.overrides[device, area, address] = (self.c.tick, list(write_values))
+            self.overrides[device, area, address] = (
+                self.c.tick,
+                list(write_values),
+            )
             return None
         try:
             for mapping in options.registers:
@@ -269,7 +323,7 @@ class EquipmentDriver:
                     self.values[device].get(mapping.field), mapping
                 )
                 if area in {"coil", "discrete"}:
-                    # Distinct bit blocks are internally packed by PyModbus.
+                    # PyModbusは分かれたbit領域を内部でワードに詰めるため、bit位置を補正する。
                     for i, value in enumerate(values):
                         bit = mapping.address + i - start * 16
                         word = bit // 16
@@ -290,12 +344,15 @@ class EquipmentDriver:
                     and tick == self.c.tick
                     and area not in {"coil", "discrete"}
                 ):
-                    registers[addr - start : addr - start + len(values)] = values
+                    registers[addr - start : addr - start + len(values)] = (
+                        values
+                    )
         except (ValueError, TypeError, OverflowError, struct.error):
             return ExcCodes.DEVICE_FAILURE
         return None
 
     async def step(self, tick):
+        """設備値を更新し、停止期間とOPC UAの品質異常を模擬する。"""
         from asyncua import ua
 
         opts = self.c.spec.equipment
@@ -321,7 +378,10 @@ class EquipmentDriver:
                 bad = (
                     opts.quality != "Good"
                     and tick >= opts.quality_from_tick
-                    and (not opts.quality_until_tick or tick <= opts.quality_until_tick)
+                    and (
+                        not opts.quality_until_tick
+                        or tick <= opts.quality_until_tick
+                    )
                 )
                 status = (
                     getattr(ua.StatusCodes, opts.quality)
@@ -347,6 +407,7 @@ class EquipmentDriver:
                     await self.nodes[device, field.name].write_value(value)
 
     async def close(self):
+        """起動済みのModbusとOPC UAを停止し、接続参照を解除する。"""
         if self.modbus:
             await self.modbus.shutdown()
             self.modbus = None

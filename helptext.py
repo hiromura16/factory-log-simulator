@@ -1,4 +1,4 @@
-"""Japanese in-place documentation, shared by the form and JSON contracts."""
+"""画面とJSON契約が共有する日本語の項目説明を保持する。"""
 
 from config import ConnectionProfile, RunSpec
 
@@ -71,7 +71,10 @@ HELP = {
         "S3 キー接頭辞",
         "バケット内の相対パス。例: landing/source-a。/から始めず、..を含めません。",
     ),
-    "region": ("リージョン", "R2はauto、AWS S3はap-northeast-1等。署名に使用します。"),
+    "region": (
+        "リージョン",
+        "R2はauto、AWS S3はap-northeast-1等。署名に使用します。",
+    ),
     "access_key": (
         "アクセスキーID",
         "S3互換ストレージの認証情報。暗号化して保存します。空欄は既存値を維持。実行環境のIAM資格情報は自動使用しません。",
@@ -124,7 +127,10 @@ HELP = {
         "MQTT クライアントID",
         "空欄なら接続ごとにランダム生成。固定する場合は他のクライアントと重複させないでください。",
     ),
-    "keepalive": ("Keep Alive 秒", "MQTTブローカーへの生存確認間隔。5〜3600秒。"),
+    "keepalive": (
+        "Keep Alive 秒",
+        "MQTTブローカーへの生存確認間隔。5〜3600秒。",
+    ),
     "retain": (
         "MQTT retain",
         "有効にすると各トピックの最後のメッセージをブローカーが保持します。時系列イベントでは通常無効です。",
@@ -411,7 +417,10 @@ HELP = {
         "画像の幅 px",
         "32〜4096ピクセル。大きな画像とノイズは生成負荷が増えます。",
     ),
-    "height": ("画像の高さ px", "32〜4096ピクセル。出力容量と生成速度に影響します。"),
+    "height": (
+        "画像の高さ px",
+        "32〜4096ピクセル。出力容量と生成速度に影響します。",
+    ),
     "format": (
         "画像形式",
         "png=可逆圧縮、jpeg=非可逆圧縮。JSON / CSVと同じrecord_keyで対応付けます。",
@@ -790,6 +799,7 @@ HELP["kind"] = (
 
 
 def annotated_schemas(kind=None):
+    """共通契約に項目説明を付け、指定種類で利用できる接続先に絞る。"""
     from config import ALLOWED_KINDS
 
     result = {
@@ -798,6 +808,10 @@ def annotated_schemas(kind=None):
     }
 
     def annotate(schema):
+        """定義済みの説明表から各項目へ注釈を付け、参照先の定義もたどる。
+
+        説明表にない項目はKeyErrorとなるため、契約へ項目を追加したら説明も追加する。
+        """
         for name, prop in schema.get("properties", {}).items():
             title, description = HELP[name]
             prop.update(title=title, description=description)
@@ -832,9 +846,13 @@ def annotated_schemas(kind=None):
         description="適用位置・条件を満たした行に対する0〜1の確率。同じrun_keyとseedなら再現可能です。",
     )
     if kind:
-        result["connection"]["properties"]["kind"]["enum"] = sorted(ALLOWED_KINDS[kind])
-        result["connection"]["properties"]["kind"]["description"] = "\n\n".join(
-            CONNECTION_HELP[k][0] + ": " + CONNECTION_HELP[k][1]
-            for k in sorted(ALLOWED_KINDS[kind])
+        result["connection"]["properties"]["kind"]["enum"] = sorted(
+            ALLOWED_KINDS[kind]
+        )
+        result["connection"]["properties"]["kind"]["description"] = (
+            "\n\n".join(
+                CONNECTION_HELP[k][0] + ": " + CONNECTION_HELP[k][1]
+                for k in sorted(ALLOWED_KINDS[kind])
+            )
         )
     return result

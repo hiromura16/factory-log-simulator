@@ -1,4 +1,7 @@
-"""Source drivers. Network libraries are imported only by the relevant app."""
+"""業務・履歴・イベントの生成処理を実行コントローラーへ接続する。
+
+通信ライブラリは必要な経路で読み込み、送信完了の意味はプロトコルごとに異なる。
+"""
 
 import asyncio
 import hashlib
@@ -23,24 +26,38 @@ from generation import generate_record, record_key, render
 
 
 class NoRedirect(HTTPRedirectHandler):
+    """HTTP送信先の自動転送を禁止するハンドラー。"""
+
     def redirect_request(self, *args, **kwargs):
+        """転送用リクエストを作らず、元の送信先以外へ追従させない。"""
         return None
 
 
 class Base:
+    """コントローラー参照とプロトコル情報を共有する最小基底ドライバー。"""
+
     def __init__(self, c):
+        """コントローラー参照と公開用プロトコル情報の格納先を設定する。"""
         self.c = c
         self.information = {}
 
     async def start(self):
+        """開始時に必要な処理を派生ドライバーで実装するための空のフック。"""
         pass
 
     async def close(self):
+        """終了時の解放処理を派生ドライバーで実装するための空のフック。"""
         pass
 
 
 class BusinessDriver(Base):
+    """REST・限定OData取得に使う業務レコードと変更履歴を生成する。"""
+
     async def start(self):
+        """保存済み進捗から初期レコードを500件ずつ生成して保存する。
+
+        各バッチで停止要求と資源制限を確認し、行と進捗を一緒に確定する。
+        """
         self.information = {
             "rest": "/source/rest/{collection}",
             "odata": "/source/odata/{collection}",
@@ -68,6 +85,7 @@ class BusinessDriver(Base):
                 )
 
     async def step(self, tick):
+        """更新対象を巡回し、元のIDを維持した変更行と指定周期の削除行を追記する。"""
         opts = self.c.spec.business
         for res in opts.resources:
             g = res.generator or self.c.spec.generator
@@ -75,28 +93,41 @@ class BusinessDriver(Base):
             for j in range(min(opts.updates_per_tick, res.rows)):
                 index = (tick * opts.updates_per_tick + j) % res.rows
                 row = generate_record(
-                    g.model_copy(update={"seed": (g.seed + tick + 1) % 2147483647}),
+                    g.model_copy(
+                        update={"seed": (g.seed + tick + 1) % 2147483647}
+                    ),
                     g.start_sequence + index,
                 )
                 row["id"] = record_key(g, g.start_sequence + index)
                 rows.append(row)
                 self.c.observe({"collection": res.name, **row})
-            if opts.delete_every_ticks and tick and tick % opts.delete_every_ticks == 0:
+            if (
+                opts.delete_every_ticks
+                and tick
+                and tick % opts.delete_every_ticks == 0
+            ):
                 index = tick % res.rows
                 rows.append(
-                    {"id": record_key(g, g.start_sequence + index), "_deleted": True}
+                    {
+                        "id": record_key(g, g.start_sequence + index),
+                        "_deleted": True,
+                    }
                 )
             if rows:
                 self.c.store.put(self.c.ds, res.name, rows)
 
 
 class HistorianDriver(Base):
+    """時刻基準と生成位置を永続化して履歴サンプルを継続生成する。"""
+
     async def start(self):
+        """保存した時刻基準・位置を復元し、不足する初期履歴を補う。"""
         self.options = self.c.spec.history
         self.anchor = self.c.store.meta("history-anchor-" + self.c.ds)
         if self.anchor is None:
             self.anchor = (
-                time.time() - self.options.initial_samples * self.options.sample_seconds
+                time.time()
+                - self.options.initial_samples * self.options.sample_seconds
             )
             self.c.store.meta("history-anchor-" + self.c.ds, self.anchor)
         self.index = self.c.store.meta("history-index-" + self.c.ds) or 0
@@ -115,6 +146,7 @@ class HistorianDriver(Base):
         }
 
     def write(self, index, observe=True):
+        """欠測・時刻ずれ・品質異常を反映し、サンプルと次位置を同一取引で保存する。"""
         opts = self.options
         missing = opts.missing_every and (index + 1) % opts.missing_every == 0
         ts = self.anchor + index * opts.sample_seconds
@@ -124,7 +156,9 @@ class HistorianDriver(Base):
         for device in range(0 if missing else opts.devices):
             record = self.c.record(index * opts.devices + device)
             if opts.source_time_field and record.get(opts.source_time_field):
-                ts = datetime.fromisoformat(record[opts.source_time_field]).timestamp()
+                ts = datetime.fromisoformat(
+                    record[opts.source_time_field]
+                ).timestamp()
             for field in opts.tags:
                 value = record.get(field)
                 quality = (
@@ -141,7 +175,13 @@ class HistorianDriver(Base):
                         quality = "Bad"
                 tag = f"device-{device + 1:03d}.{field}"
                 rows.append(
-                    (self.c.ds, tag, ts, json.dumps(value, allow_nan=False), quality)
+                    (
+                        self.c.ds,
+                        tag,
+                        ts,
+                        json.dumps(value, allow_nan=False),
+                        quality,
+                    )
                 )
                 if observe:
                     self.c.observe(
@@ -156,7 +196,8 @@ class HistorianDriver(Base):
                     )
         with self.c.store.db() as db:
             db.executemany(
-                "INSERT INTO samples(ds,tag,ts,value,quality) VALUES(?,?,?,?,?)", rows
+                "INSERT INTO samples(ds,tag,ts,value,quality) VALUES(?,?,?,?,?)",
+                rows,
             )
             db.execute(
                 "INSERT INTO meta VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
@@ -164,18 +205,25 @@ class HistorianDriver(Base):
             )
 
     async def step(self, tick):
+        """次の履歴を生成し、100tickごとに保持期間を過ぎた同一データセットを削除する。"""
         self.write(self.index)
         self.index += 1
         if tick % 100 == 0:
             with self.c.store.db() as db:
                 db.execute(
                     "DELETE FROM samples WHERE ds=? AND ts<?",
-                    (self.c.ds, time.time() - self.options.retention_days * 86400),
+                    (
+                        self.c.ds,
+                        time.time() - self.options.retention_days * 86400,
+                    ),
                 )
 
 
 class EventDriver(Base):
+    """ログ・識別イベントを永続キューに保存して設定先へ配送する。"""
+
     async def start(self):
+        """配送先識別子とデータセット別連番を復元し、必要なら回転ログを開く。"""
         self.target = hashlib.sha256(
             json.dumps(
                 {
@@ -194,12 +242,14 @@ class EventDriver(Base):
             ).encode()
         ).hexdigest()
         self.index_key = "event-index-" + self.c.ds
-        # A new dataset has its own logical clock, even on the same destination.
+        # 同じ配送先でも、新しいデータセットには独立した論理時計を持たせる。
         self.index = self.c.store.meta(self.index_key) or 0
         self.mqtt = None
         self.handler = None
         if self.c.kind == "logs" and self.c.profile.output == "file":
-            folder = Path(os.environ.get("LOG_DIR", str(self.c.store.root / "logs")))
+            folder = Path(
+                os.environ.get("LOG_DIR", str(self.c.store.root / "logs"))
+            )
             folder.mkdir(parents=True, exist_ok=True)
             self.handler = logging.handlers.RotatingFileHandler(
                 folder / "events.log",
@@ -214,9 +264,14 @@ class EventDriver(Base):
         }
 
     def event(self, sequence):
+        """共通生成行に識別イベントのID・読取機・バーコード等を補う。
+
+        明示された既存項目は維持し、異常周期に当たる識別子だけを置き換える。
+        """
         row = self.c.record(sequence)
         row.setdefault(
-            "event_id", row.get("id", record_key(self.c.spec.generator, sequence))
+            "event_id",
+            row.get("id", record_key(self.c.spec.generator, sequence)),
         )
         if self.c.kind == "identification":
             opts = self.c.spec.identification
@@ -225,7 +280,9 @@ class EventDriver(Base):
             row.setdefault("tag_id", f"TAG-{index:06d}")
             row.setdefault("epc", f"{0x300000000000000000000000 + index:024X}")
             row.setdefault("reader_id", opts.readers[reader])
-            row.setdefault("operator_id", opts.operators[index % len(opts.operators)])
+            row.setdefault(
+                "operator_id", opts.operators[index % len(opts.operators)]
+            )
             row.setdefault("event_type", "passage")
             row.setdefault(
                 "direction",
@@ -238,7 +295,10 @@ class EventDriver(Base):
             row.setdefault("lot_id", f"LOT-{index // 10:05d}")
             base = f"{490000000000 + index:012d}"
             digit = (
-                -sum(int(v) * (1 if i % 2 == 0 else 3) for i, v in enumerate(base))
+                -sum(
+                    int(v) * (1 if i % 2 == 0 else 3)
+                    for i, v in enumerate(base)
+                )
             ) % 10
             row.setdefault("barcode", base + str(digit))
             if (
@@ -254,6 +314,7 @@ class EventDriver(Base):
         return row
 
     def log_message(self, row, sequence):
+        """生成行を指定のJSONL・平文・Syslog書式の一メッセージに整形する。"""
         opts = self.c.spec.logs
         message = render(opts.message_template, {**row, "sequence": sequence})
         if opts.format == "jsonl":
@@ -295,6 +356,7 @@ class EventDriver(Base):
         )
 
     async def step(self, tick):
+        """欠落・重複・破損を模擬してイベントと次連番を保存し、配送を試みる。"""
         for j in range(self.c.spec.batch_size):
             sequence = self.index
             self.index += 1
@@ -323,7 +385,10 @@ class EventDriver(Base):
             ):
                 payload = "BROKEN-HEADER " + payload[8:]
             entries = [(row["event_id"], payload)]
-            if opts.duplicate_every and (sequence + 1) % opts.duplicate_every == 0:
+            if (
+                opts.duplicate_every
+                and (sequence + 1) % opts.duplicate_every == 0
+            ):
                 entries.append((row["event_id"] + "-duplicate", payload))
             with self.c.store.db() as db:
                 db.executemany(
@@ -349,6 +414,7 @@ class EventDriver(Base):
         await self.flush()
 
     def context(self):
+        """出力用CAを読み込み、明示された検証設定でTLSコンテキストを作る。"""
         p = self.c.profile
         ctx = ssl.create_default_context(
             cafile=connection_file(p.ca_file) if p.ca_file else None
@@ -359,11 +425,17 @@ class EventDriver(Base):
         return ctx
 
     def send(self, payload):
+        """出力方式に応じて一件を送信またはローカルへ書き込む。
+
+        UDP/TCPの成功は受信アプリの処理完了を意味しない。HTTPは受付応答、MQTTはQoS1 ACKを確認する。
+        """
         p = self.c.profile
         data = payload.encode()
         if p.output == "file":
             self.handler.emit(
-                logging.LogRecord("factory", logging.INFO, "", 0, payload, (), None)
+                logging.LogRecord(
+                    "factory", logging.INFO, "", 0, payload, (), None
+                )
             )
             self.handler.flush()
             return
@@ -394,12 +466,17 @@ class EventDriver(Base):
         if p.output == "http":
             headers = {"Content-Type": "application/json"}
             if p.output_token:
-                headers["Authorization"] = "Bearer " + p.output_token.get_secret_value()
+                headers["Authorization"] = (
+                    "Bearer " + p.output_token.get_secret_value()
+                )
             opener = build_opener(
-                ProxyHandler({}), HTTPSHandler(context=self.context()), NoRedirect()
+                ProxyHandler({}),
+                HTTPSHandler(context=self.context()),
+                NoRedirect(),
             )
             with opener.open(
-                Request(p.url, data=data, headers=headers), timeout=p.timeout_seconds
+                Request(p.url, data=data, headers=headers),
+                timeout=p.timeout_seconds,
             ) as r:
                 if r.status not in {200, 201, 202, 204}:
                     raise RuntimeError("HTTP rejected")
@@ -430,7 +507,9 @@ class EventDriver(Base):
                     )
                 if p.mqtt_tls:
                     self.mqtt.tls_set_context(self.context())
-                self.mqtt.connect(p.host, p.port or (8883 if p.mqtt_tls else 1883), 30)
+                self.mqtt.connect(
+                    p.host, p.port or (8883 if p.mqtt_tls else 1883), 30
+                )
                 self.mqtt.loop_start()
             ack = self.mqtt.publish(p.topic, data, qos=1)
             ack.wait_for_publish(timeout=p.timeout_seconds)
@@ -438,6 +517,10 @@ class EventDriver(Base):
                 raise TimeoutError("MQTT acknowledgement timeout")
 
     async def flush(self):
+        """未配送の最大100件を順に送り、失敗時はその位置で中断する。
+
+        成功後に配送済みへ更新するため、送信直後の中断では再送が起こり得る。
+        """
         if self.c.profile.output == "capture":
             return
         with self.c.store.db() as db:
@@ -453,10 +536,12 @@ class EventDriver(Base):
                 break
             with self.c.store.db() as db:
                 db.execute(
-                    "UPDATE events SET status='delivered' WHERE seq=?", (row["seq"],)
+                    "UPDATE events SET status='delivered' WHERE seq=?",
+                    (row["seq"],),
                 )
 
     async def close(self):
+        """回転ログとMQTT接続・ネットワークループを終了する。"""
         if self.handler:
             self.handler.close()
         if self.mqtt:
@@ -465,6 +550,7 @@ class EventDriver(Base):
 
 
 def create_driver(c):
+    """アプリの種類からドライバーを選び、設備ライブラリは必要時だけ読み込む。"""
     if c.kind == "equipment":
         from equipment import EquipmentDriver
 

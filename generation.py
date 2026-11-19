@@ -1,4 +1,7 @@
-"""Deterministic declarative generation. No eval, SQL fragments, or Python execution."""
+"""宣言的な項目定義から再現可能なデータと意図的な異常を生成する。
+
+式の評価にevalを使わず、許可した演算・参照だけを解釈する。
+"""
 
 from __future__ import annotations
 
@@ -16,16 +19,23 @@ from config import RunSpec
 
 
 class GenerationError(ValueError):
+    """生成定義・型・容量の制約違反を表す入力エラー。"""
+
     pass
 
 
 def record_key(spec, sequence):
+    """実行キー・seed・連番から再生成しても同じ行識別子を作る。"""
     return hashlib.sha256(
         f"source.v2:{spec.run_key}:{spec.seed}:{sequence}".encode()
     ).hexdigest()[:32]
 
 
 def encode_json(value, *, pretty=False, limit=1024 * 1024):
+    """非有限数を拒否し、UTF-8バイト数の上限内でJSONへ変換する。
+
+    上限超過はGenerationErrorとし、巨大な結果の完成前に検出する。
+    """
     chunks = []
     size = 0
     encoder = json.JSONEncoder(
@@ -43,6 +53,7 @@ def encode_json(value, *, pretty=False, limit=1024 * 1024):
 
 
 def resolve(value, parameters):
+    """$で始まる値を名前付きパラメーターへ解決し、未定義参照を拒否する。"""
     if isinstance(value, str) and value.startswith("$"):
         key = value[1:]
         if key not in parameters:
@@ -52,8 +63,14 @@ def resolve(value, parameters):
 
 
 def render(template, values):
+    """項目名と限定した短い書式だけを許可してテンプレートを展開する。
+
+    属性参照や変換指定を許可せず、結果長の上限も検証する。
+    """
     parts = []
-    for literal, name, format_spec, conversion in string.Formatter().parse(template):
+    for literal, name, format_spec, conversion in string.Formatter().parse(
+        template
+    ):
         parts.append(literal)
         if name is None:
             continue
@@ -77,6 +94,7 @@ def render(template, values):
 
 
 def coerce(value, field):
+    """項目型へ変換し、主キーNULL・精度・文字数・日時の制約を検証する。"""
     if value is None:
         if field.primary_key:
             raise GenerationError("主キーはNULLにできません")
@@ -102,13 +120,17 @@ def coerce(value, field):
             return round(number, field.scale)
         with localcontext() as context:
             context.prec = 60
-            result = Decimal(str(value)).quantize(Decimal(1).scaleb(-field.scale))
+            result = Decimal(str(value)).quantize(
+                Decimal(1).scaleb(-field.scale)
+            )
         if len(result.as_tuple().digits) > field.precision:
             raise GenerationError("小数の精度上限を超えています")
         return str(result)
     if dtype == "boolean":
         if not isinstance(value, bool):
-            raise GenerationError("真偽値の項目にはboolean生成を指定してください")
+            raise GenerationError(
+                "真偽値の項目にはboolean生成を指定してください"
+            )
         return value
     if dtype == "datetime":
         dt = datetime.fromisoformat(str(value))
@@ -118,16 +140,28 @@ def coerce(value, field):
     return value
 
 
-def generate_record(spec: RunSpec, sequence: int, *, apply_anomalies=True, trace=None):
+def generate_record(
+    spec: RunSpec, sequence: int, *, apply_anomalies=True, trace=None
+):
+    """連番と項目別seedで一行を生成し、最後に指定の異常ルールを適用する。
+
+    依存項目は定義順に解決する。apply_anomalies=Falseは異常コピー時の再帰適用を防ぐ。
+    """
     row = {}
     key = record_key(spec, sequence)
     parameters = spec.parameters
     for field in spec.fields:
         rng = random.Random(
-            int(hashlib.sha256((key + ":" + field.name).encode()).hexdigest()[:16], 16)
+            int(
+                hashlib.sha256((key + ":" + field.name).encode()).hexdigest()[
+                    :16
+                ],
+                16,
+            )
         )
 
         def get(name):
+            """現在のフィールド設定から値を取り、パラメーター参照を解決する。"""
             return resolve(getattr(field, name), parameters)
 
         group = int(get("group_size"))
@@ -187,12 +221,16 @@ def generate_record(spec: RunSpec, sequence: int, *, apply_anomalies=True, trace
             at = datetime.fromisoformat(str(get("start")))
             if at.tzinfo is None:
                 raise GenerationError("開始日時にはタイムゾーンが必要です")
-            value = (at + timedelta(seconds=index * float(get("step")))).isoformat()
+            value = (
+                at + timedelta(seconds=index * float(get("step")))
+            ).isoformat()
         else:
             try:
                 values = [row[name] for name in field.sources]
             except KeyError as exc:
-                raise GenerationError("参照元の項目は先に定義してください") from exc
+                raise GenerationError(
+                    "参照元の項目は先に定義してください"
+                ) from exc
             if kind == "reference":
                 value = values[0]
             else:
@@ -208,13 +246,20 @@ def generate_record(spec: RunSpec, sequence: int, *, apply_anomalies=True, trace
                         value = math.prod(numeric)
                     elif kind == "ratio":
                         if len(numeric) != 2 or not numeric[1]:
-                            raise GenerationError("比率には0でない分母が必要です")
+                            raise GenerationError(
+                                "比率には0でない分母が必要です"
+                            )
                         value = numeric[0] / numeric[1]
         if field.condition:
             condition = field.condition
             if condition.field not in row:
-                raise GenerationError("条件が参照する項目を先に定義してください")
-            left, right = row[condition.field], resolve(condition.value, parameters)
+                raise GenerationError(
+                    "条件が参照する項目を先に定義してください"
+                )
+            left, right = (
+                row[condition.field],
+                resolve(condition.value, parameters),
+            )
             op = condition.operator
             matches = {
                 "eq": lambda: left == right,
@@ -236,6 +281,7 @@ def generate_record(spec: RunSpec, sequence: int, *, apply_anomalies=True, trace
 
 
 def matches(left, operator, right):
+    """宣言的な比較演算子を対応する比較処理へ割り当てる。"""
     return {
         "eq": lambda: left == right,
         "ne": lambda: left != right,
@@ -248,6 +294,10 @@ def matches(left, operator, right):
 
 
 def inject_anomalies(spec, row, sequence, trace=None):
+    """行位置・確率・条件に合う異常を定義順で適用する。
+
+    trace指定時は適用名を追記する。検証の迂回は明示されたルールだけで行う。
+    """
     offset = sequence - spec.start_sequence
     fields = {f.name: f for f in spec.fields}
     for index, rule in enumerate(spec.anomalies):
@@ -261,7 +311,9 @@ def inject_anomalies(spec, row, sequence, trace=None):
         rng = random.Random(
             int(
                 hashlib.sha256(
-                    (record_key(spec, sequence) + ":anomaly:" + str(index)).encode()
+                    (
+                        record_key(spec, sequence) + ":anomaly:" + str(index)
+                    ).encode()
                 ).hexdigest()[:16],
                 16,
             )
@@ -291,15 +343,20 @@ def inject_anomalies(spec, row, sequence, trace=None):
         elif rule.operation == "null":
             result = None
         elif rule.operation in {"freeze", "copy_from"}:
-            anchor = rule.from_row if rule.operation == "freeze" else int(value)
+            anchor = (
+                rule.from_row if rule.operation == "freeze" else int(value)
+            )
             if anchor < 0:
-                raise GenerationError("コピー元のレコード位置は0以上にしてください")
+                raise GenerationError(
+                    "コピー元のレコード位置は0以上にしてください"
+                )
             result = generate_record(
                 spec, spec.start_sequence + anchor, apply_anomalies=False
             )[rule.field]
         elif rule.operation == "timestamp_shift":
             result = (
-                datetime.fromisoformat(str(original)) + timedelta(seconds=float(value))
+                datetime.fromisoformat(str(original))
+                + timedelta(seconds=float(value))
             ).isoformat()
         else:
             with localcontext() as context:
@@ -320,12 +377,15 @@ def inject_anomalies(spec, row, sequence, trace=None):
                 else float(result)
             )
         row[rule.field] = (
-            result if rule.bypass_validation else coerce(result, fields[rule.field])
+            result
+            if rule.bypass_validation
+            else coerce(result, fields[rule.field])
         )
     return row
 
 
 def sample_offsets(spec):
+    """先頭・中間・末尾と異常開始終了の境界を検査用位置として返す。"""
     offsets = {0, min(97, spec.rows - 1), spec.rows - 1}
     for rule in spec.anomalies:
         if rule.enabled and rule.from_row < spec.rows:
@@ -337,12 +397,19 @@ def sample_offsets(spec):
 
 
 def validate_generation(spec):
-    # Check the beginning, a later point and the end without materializing the run.
+    # 全件を実体化せず、先頭・途中・末尾と異常境界を代表点として検査する。
+    """全件生成せず境界サンプルと本文テンプレートを事前検証する。
+
+    代表点の検査であり、全連番の成功を保証するものではない。
+    """
     for offset in sample_offsets(spec):
         sequence = spec.start_sequence + offset
         row = generate_record(spec, sequence)
         encode_json(row)
-        for template in [spec.files.json_template, spec.stream.payload_template]:
+        for template in [
+            spec.files.json_template,
+            spec.stream.payload_template,
+        ]:
             if template is not None:
                 encode_json(
                     map_json(
@@ -360,11 +427,18 @@ def validate_generation(spec):
 
 
 def batch_limit(spec, requested):
+    """代表レコードの大きさとバースト指定からバッチ件数を抑える。
+
+    16MiBを基準に余裕を見積もるが、後続行の最大サイズを厳密には保証しない。
+    """
     size = 256
     for offset in sample_offsets(spec):
         row = generate_record(spec, spec.start_sequence + offset)
         size = max(size, len(encode_json(row).encode()))
-        for template in [spec.files.json_template, spec.stream.payload_template]:
+        for template in [
+            spec.files.json_template,
+            spec.stream.payload_template,
+        ]:
             if template is not None:
                 size = max(
                     size,
@@ -396,6 +470,10 @@ def batch_limit(spec, requested):
 
 
 def map_json(template, row, parameters, metadata, depth=0):
+    """辞書・配列をたどり、許可した名前空間の参照をJSONへ反映する。
+
+    入れ子の深さと参照先を検証する。template=Noneは元の行を返す。
+    """
     if template is None:
         return row
     if depth > 32:
@@ -406,41 +484,60 @@ def map_json(template, row, parameters, metadata, depth=0):
             for k, v in template.items()
         }
     if isinstance(template, list):
-        return [map_json(v, row, parameters, metadata, depth + 1) for v in template]
+        return [
+            map_json(v, row, parameters, metadata, depth + 1) for v in template
+        ]
     if isinstance(template, str) and template.startswith(
         ("$row.", "$parameters.", "$meta.")
     ):
         namespace, *parts = template[1:].split(".")
-        value = {"row": row, "parameters": parameters, "meta": metadata}[namespace]
+        value = {"row": row, "parameters": parameters, "meta": metadata}[
+            namespace
+        ]
         for part in parts:
             if isinstance(value, dict) and part in value:
                 value = value[part]
-            elif isinstance(value, list) and part.isdigit() and int(part) < len(value):
+            elif (
+                isinstance(value, list)
+                and part.isdigit()
+                and int(part) < len(value)
+            ):
                 value = value[int(part)]
             else:
-                raise GenerationError("JSONテンプレートの参照先が見つかりません")
+                raise GenerationError(
+                    "JSONテンプレートの参照先が見つかりません"
+                )
         return value
     return template
 
 
 def stream_payload(spec, row, sequence):
+    """本文テンプレートへ行とメタ情報を渡し、必要なら包絡を付ける。
+
+    メタ情報のキー衝突やオブジェクトでない本文を拒否する。
+    """
     metadata = {
         "record_key": record_key(spec, sequence),
         "sequence": sequence,
         "run_key": spec.run_key,
     }
-    payload = map_json(spec.stream.payload_template, row, spec.parameters, metadata)
+    payload = map_json(
+        spec.stream.payload_template, row, spec.parameters, metadata
+    )
     if spec.stream.envelope:
         if not isinstance(payload, dict):
             raise GenerationError(
                 "メタデータを追加する場合、本文テンプレートはJSONオブジェクトにしてください"
             )
         if spec.stream.metadata_key in payload:
-            raise GenerationError("メタデータの項目名と送信本文のキーが重複しています")
+            raise GenerationError(
+                "メタデータの項目名と送信本文のキーが重複しています"
+            )
         payload = {**payload, spec.stream.metadata_key: metadata}
     return payload
 
 
 def inject_fault(spec, ctx, stage, batch):
+    """有効な障害設定だけを実行コンテキストの注入処理へ委譲する。"""
     if spec.faults.enabled and spec.faults.action != "none":
         ctx.inject(stage, batch)
