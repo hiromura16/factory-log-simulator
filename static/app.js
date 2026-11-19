@@ -16,7 +16,8 @@ let info,
   profiles = [],
   state,
   uid = 0;
-/* タグ・属性・表示文字列から未配置のDOM要素を返す。文字列はHTMLとして解釈せずtextContentに設定する。 */ function el(
+/* タグ・属性・表示文字列から未配置のDOM要素を返す。文字列はHTMLとして解釈せずtextContentに設定する。 */
+function el(
   tag,
   attrs = {},
   text = "",
@@ -26,14 +27,16 @@ let info,
   n.textContent = text;
   return n;
 }
-/* 通知欄の内容とエラー用CSSクラスを更新する。戻り値は使わず、直前の通知を置き換える。 */ function notice(
+/* 通知欄の内容とエラー用CSSクラスを更新する。戻り値は使わず、直前の通知を置き換える。 */
+function notice(
   value,
   error = false,
 ) {
   $("#notice").textContent = value;
   $("#notice").className = error ? "error" : "";
 }
-/* 本文なしはGET、本文ありはJSONのPOSTで同一サービスへ要求し、JSON応答を返す。通信・JSON解析・非成功応答は例外として呼出側へ伝える。 */ async function api(
+/* 本文なしはGET、本文ありはJSONのPOSTで同一サービスへ要求し、JSON応答を返す。通信・JSON解析・非成功応答は例外として呼出側へ伝える。 */
+async function api(
   path,
   body,
 ) {
@@ -54,7 +57,8 @@ let info,
     );
   return v;
 }
-/* 指定ボタンへ非同期処理を登録する。処理中の二重操作を防ぎ、失敗通知とボタン復帰を共通化する。 */ function action(
+/* 指定ボタンへ非同期処理を登録する。処理中の二重操作を防ぎ、失敗通知とボタン復帰を共通化する。 */
+function action(
   id,
   fn,
 ) {
@@ -74,7 +78,8 @@ let info,
       }
     };
 }
-/* 対象IDのパネルとナビゲーションにactiveを付け、他を非表示扱いにする。編集モデル自体は変更しない。 */ function tab(
+/* 対象IDのパネルとナビゲーションにactiveを付け、他を非表示扱いにする。編集モデル自体は変更しない。 */
+function tab(
   id,
 ) {
   document
@@ -90,13 +95,15 @@ let info,
         x.classList.toggle("active", x.dataset.tab === id),
     );
 }
-/* ローカルJSON Schemaの$refを$defsから引く。外部URLの取得や参照先の存在検証は行わない。 */ function ref(
+/* ローカルJSON Schemaの$refを$defsから引く。外部URLの取得や参照先の存在検証は行わない。 */
+function ref(
   s,
   root,
 ) {
   return s.$ref ? root.$defs[s.$ref.split("/").pop()] : s;
 }
-/* スキーマから編集用初期値を再帰生成する。defaultは複製し、nullableはnull、配列は空、オブジェクトは各プロパティを初期化する。 */ function empty(
+/* スキーマから編集用初期値を再帰生成する。defaultは複製し、nullableはnull、配列は空、オブジェクトは各プロパティを初期化する。 */
+function empty(
   s,
   root,
 ) {
@@ -122,7 +129,8 @@ let info,
   if (s.enum) return s.enum[0];
   return s.type === "boolean" ? false : ["integer", "number"].includes(s.type) ? 0 : "";
 }
-/* 表示可能なプロパティごとに入力部品を配置する。欠けた値はモデルへ初期設定し、変更コールバックが同じモデルを更新する。 */ function object(
+/* 表示可能なプロパティごとに入力部品を配置する。欠けた値はモデルへ初期設定し、変更コールバックが同じモデルを更新する。 */
+function object(
   parent,
   schema,
   model,
@@ -142,7 +150,8 @@ let info,
     );
   }
 }
-/* スキーマに合うDOM入力を返す。変更時はsetへ値を渡す。入れ子・配列・秘密・JSONを分け、ここでは保存要求を送らない。 */ function control(
+/* スキーマに合うDOM入力を返す。変更時はsetへ値を渡す。入れ子・配列・秘密・JSONを分け、ここでは保存要求を送らない。 */
+function control(
   key,
   s,
   value,
@@ -182,7 +191,8 @@ let info,
     checkbox.checked = value != null;
     const area = el("div", { class: "grid" });
     box.append(checkbox, area);
-    /* 有効チェックに応じて入れ子フォームを再生成する。無効時はnullを通知し、有効時のみ初期値または既存値を編集する。 */ function draw() {
+    /* 有効チェックに応じて入れ子フォームを再生成する。無効時はnullを通知し、有効時のみ初期値または既存値を編集する。 */
+    function draw() {
       area.replaceChildren();
       if (checkbox.checked) {
         value = value || empty(nullableObject, root);
@@ -209,7 +219,8 @@ let info,
     box.classList.add("subsection");
     const area = el("div");
     box.append(area);
-    /* 配列全体のカードを再生成する。編集後は添字が変わるため、古いカードのイベント処理を再利用しない。 */ function draw() {
+    /* 配列全体のカードを再生成する。編集後は添字が変わるため、古いカードのイベント処理を再利用しない。 */
+    function draw() {
       area.replaceChildren();
       value.forEach(
         /* 配列の一行を編集カードへ変換し、移動・複製・削除ボタンを配置する。 */ (
@@ -349,19 +360,22 @@ let info,
   box.append(input);
   return box;
 }
-/* 生成設定の編集領域を現在specから作り直す。DOMのみ置き換え、サーバーへ保存しない。 */ function render() {
+/* 生成設定の編集領域を現在specから作り直す。DOMのみ置き換え、サーバーへ保存しない。 */
+function render() {
   const target = $("#editor");
   target.replaceChildren();
   const area = el("div", { class: "card grid" });
   object(area, info.schemas.spec, spec, info.schemas.spec);
   target.append(area);
 }
-/* 現在profileから接続設定フォームを作り直す。保存は別の操作で行う。 */ function renderProfile() {
+/* 現在profileから接続設定フォームを作り直す。保存は別の操作で行う。 */
+function renderProfile() {
   const form = $("#profileForm");
   form.replaceChildren();
   object(form, info.schemas.profile, profile, info.schemas.profile);
 }
-/* プロファイルを複製して表示管理用のrevisionとconfigured_secretsを除く。元データは変更しない。 */ function cleanProfile(
+/* プロファイルを複製して表示管理用のrevisionとconfigured_secretsを除く。元データは変更しない。 */
+function cleanProfile(
   p,
 ) {
   const v = copy(p);
@@ -369,7 +383,8 @@ let info,
   delete v.configured_secrets;
   return v;
 }
-/* プロファイルとプリセットを順に再取得して選択肢を再構成する。通信失敗は呼出側へ伝わり、途中まで更新される場合がある。 */ async function refresh() {
+/* プロファイルとプリセットを順に再取得して選択肢を再構成する。通信失敗は呼出側へ伝わり、途中まで更新される場合がある。 */
+async function refresh() {
   profiles = (await api("/api/profiles")).profiles;
   $("#profileSelect").replaceChildren(
     ...profiles.map(
@@ -386,14 +401,16 @@ let info,
   );
   description();
 }
-/* 選択プリセットの説明を文字列として表示する。未選択・未検出は空文字列にする。 */ function description() {
+/* 選択プリセットの説明を文字列として表示する。未選択・未検出は空文字列にする。 */
+function description() {
   const p = presets.find(
     /* 現在選択中のプリセットIDと一致する要素を探す。 */ (p) =>
       p.id === $("#presetSelect").value,
   );
   $("#presetDetails").textContent = p?.spec.description || "";
 }
-/* フォーム内の制約違反を探す。該当箇所のdetailsを開いてブラウザーの検証表示を出し、例外で後続操作を止める。 */ function validated(
+/* フォーム内の制約違反を探す。該当箇所のdetailsを開いてブラウザーの検証表示を出し、例外で後続操作を止める。 */
+function validated(
   selector,
 ) {
   for (const input of $(selector).querySelectorAll("input,select,textarea"))
@@ -403,7 +420,8 @@ let info,
       throw new Error("入力を確認してください");
     }
 }
-/* 行配列から表を作り直す。全行のキーの和集合を列にし、欠落値を明示する。値はHTMLとして解釈しない。 */ function table(
+/* 行配列から表を作り直す。全行のキーの和集合を列にし、欠落値を明示する。値はHTMLとして解釈しない。 */
+function table(
   target,
   rows,
 ) {
@@ -446,7 +464,8 @@ let info,
   );
   target.append(t);
 }
-/* 値を整形JSONのBlobへ変換し、指定名でブラウザーダウンロードを開始する。生成URLは遅延解放してクリック直後の読込を妨げない。 */ function download(
+/* 値を整形JSONのBlobへ変換し、指定名でブラウザーダウンロードを開始する。生成URLは遅延解放してクリック直後の読込を妨げない。 */
+function download(
   value,
   name,
 ) {
@@ -463,7 +482,8 @@ let info,
     1000,
   );
 }
-/* 実行状態を取得し、件数・状態JSON・公開インターフェース・最近のレコードを更新する。取得失敗は呼出側が扱う。 */ async function monitor() {
+/* 実行状態を取得し、件数・状態JSON・公開インターフェース・最近のレコードを更新する。取得失敗は呼出側が扱う。 */
+async function monitor() {
   state = await api("/api/state");
   $("#status").textContent =
     state.status + " · " + state.produced.toLocaleString() + "件";
@@ -478,7 +498,8 @@ let info,
   table($("#currentTable"), state.recent);
 }
 const tip = $("#tooltip");
-/* 説明対象のdata-helpを表示し、画面外へはみ出しにくい位置へツールチップを配置する。説明のない対象は何もしない。 */ function show(
+/* 説明対象のdata-helpを表示し、画面外へはみ出しにくい位置へツールチップを配置する。説明のない対象は何もしない。 */
+function show(
   target,
 ) {
   if (!target?.dataset.help) return;
@@ -496,7 +517,8 @@ const tip = $("#tooltip");
         : r.top - tip.offsetHeight - 8,
     ) + "px";
 }
-/* ツールチップを非表示にする。説明文の内容は保持する。 */ function hide() {
+/* ツールチップを非表示にする。説明文の内容は保持する。 */
+function hide() {
   tip.hidden = true;
 }
 document.onmouseover =
@@ -525,7 +547,8 @@ window.addEventListener(
   },
   true,
 );
-/* 初期情報・保存済み設定を読み、フォームと操作イベントを接続する。最後に状態監視を開始する。初期化失敗は末尾のcatchで通知する。 */ async function init() {
+/* 初期情報・保存済み設定を読み、フォームと操作イベントを接続する。最後に状態監視を開始する。初期化失敗は末尾のcatchで通知する。 */
+async function init() {
   info = await api("/api/info");
   $("#title").textContent = info.title;
   document.title = info.title;
@@ -601,7 +624,8 @@ window.addEventListener(
       tab("json");
     },
   );
-  /* JSON欄を解析してプレビューAPIで検証し、正規化された設定を返す。JSON構文・API検証エラーは呼出側へ伝える。 */ async function fromJson() {
+  /* JSON欄を解析してプレビューAPIで検証し、正規化された設定を返す。JSON構文・API検証エラーは呼出側へ伝える。 */
+  async function fromJson() {
     return (await api("/api/preview", JSON.parse($("#jsonText").value))).validated_spec;
   }
   action(
