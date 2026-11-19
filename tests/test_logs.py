@@ -1,3 +1,5 @@
+"""一時的なUDP・TCP受信ソケットで模擬syslogの実送信を検証する。"""
+
 import asyncio
 import socket
 import threading
@@ -8,7 +10,14 @@ from drivers import EventDriver
 
 
 def test_syslog_udp_rfc5424_and_tcp_octet_framing(tmp_path):
+    """UDPのRFC 5424メッセージとTCPの長さ接頭辞を検証する。"""
+
     async def run():
+        """ループバック宛てにUDPとTCPでログを一件ずつ送信する。
+
+        UDPでは形式と送達記録、TCPでは接頭辞のバイト数が本文長に
+        等しいことを確認する。
+        """
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as receiver:
             receiver.bind(("127.0.0.1", 0))
             receiver.settimeout(2)
@@ -38,6 +47,7 @@ def test_syslog_udp_rfc5424_and_tcp_octet_framing(tmp_path):
             received = []
 
             def accept():
+                """別スレッドでTCP接続を一件受け、受信したバイト列を記録する。"""
                 conn, _ = receiver.accept()
                 with conn:
                     received.append(conn.recv(65535))

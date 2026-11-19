@@ -1,3 +1,5 @@
+# 再現可能なPython実行環境を作り、非rootユーザーで単一ASGIプロセスを起動する。
+# /dataは永続化領域。ビルド自体は外部へのデプロイやサービス起動を行わない。
 FROM python:3.12-slim@sha256:05a994d2344eb364cc186910f4fc8786a38215f39f00d0acc25bff33a08f4177
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
