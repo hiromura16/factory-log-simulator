@@ -1,4 +1,7 @@
-"""Versioned, declarative settings for independent pull and push source simulators."""
+"""各模擬ソースの設定と公開・認証プロファイルを定義する。
+
+クラスコメントは開発者向けであり、公開スキーマの説明や既定値を変更しない。
+"""
 
 from __future__ import annotations
 from typing import Literal
@@ -6,10 +9,12 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 from config import RunSpec
 
 
+# 未知の設定項目を拒否するアプリ共通入力モデル。
 class Model(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
+# 取得API認証、設備公開条件とイベント送信先をまとめる。
 class Profile(Model):
     id: str = Field(
         default="default",
@@ -88,7 +93,9 @@ class Profile(Model):
         le=65535,
         description="コンテナ内のModbus TCP待受。非特権ユーザーのため既定は1502です。",
     )
-    output: Literal["capture", "file", "udp", "tcp", "tls", "mqtt", "http"] = "capture"
+    output: Literal["capture", "file", "udp", "tcp", "tls", "mqtt", "http"] = (
+        "capture"
+    )
     host: str = Field(
         default="",
         max_length=255,
@@ -120,7 +127,8 @@ class Profile(Model):
         description="MQTT接続でTLSを使用。既定ポートは有効時8883、無効時1883。CAと検証設定も適用します。",
     )
     output_password: SecretStr | None = Field(
-        default=None, description="MQTT送信先パスワード。暗号化して保存します。"
+        default=None,
+        description="MQTT送信先パスワード。暗号化して保存します。",
     )
     output_token: SecretStr | None = Field(
         default=None,
@@ -143,6 +151,7 @@ class Profile(Model):
     )
 
 
+# 生成項目とModbus領域・アドレス・型変換を対応付ける。
 class Register(Model):
     field: str = Field(
         default="value",
@@ -171,6 +180,7 @@ class Register(Model):
     )
 
 
+# 設備数、公開値、レジスター対応と通信・品質異常を定義する。
 class Equipment(Model):
     devices: int = Field(
         default=4,
@@ -192,14 +202,18 @@ class Equipment(Model):
         max_length=100,
         description="データ項目とレジスターの対応表。領域内でアドレス幅が重複しないよう指定します。",
     )
-    quality: Literal["Good", "BadSensorFailure", "UncertainLastUsableValue"] = "Good"
+    quality: Literal[
+        "Good", "BadSensorFailure", "UncertainLastUsableValue"
+    ] = "Good"
     quality_from_tick: int = Field(
         default=0,
         ge=0,
         description="このtick以降に品質コードを適用します。0は開始直後。",
     )
     quality_until_tick: int = Field(
-        default=0, ge=0, description="0は最後まで。このtickを過ぎるとGoodへ戻ります。"
+        default=0,
+        ge=0,
+        description="0は最後まで。このtickを過ぎるとGoodへ戻ります。",
     )
     offline_from_tick: int = Field(
         default=0,
@@ -225,6 +239,7 @@ class Equipment(Model):
 
     @model_validator(mode="after")
     def overlap(self):
+        """同じ領域のアドレス重複、範囲外とbit領域の型不一致を拒否する。"""
         used = set()
         for r in self.registers:
             width = {"uint32": 2, "int32": 2, "float32": 2, "float64": 4}.get(
@@ -234,11 +249,14 @@ class Equipment(Model):
                 raise ValueError("coil/discreteの型はboolです")
             for address in range(r.address, r.address + width):
                 if address > 65535 or (r.area, address) in used:
-                    raise ValueError("レジスターのアドレス幅が重複・範囲外です")
+                    raise ValueError(
+                        "レジスターのアドレス幅が重複・範囲外です"
+                    )
                 used.add((r.area, address))
         return self
 
 
+# 業務コレクション名、初期件数と専用の生成条件を定義する。
 class Resource(Model):
     name: str = Field(
         default="orders",
@@ -246,7 +264,10 @@ class Resource(Model):
         description="コレクション名。REST/ODataのURLの末尾になります。",
     )
     rows: int = Field(
-        default=200, ge=1, le=1000000, description="最初に用意する業務レコード数。"
+        default=200,
+        ge=1,
+        le=1000000,
+        description="最初に用意する業務レコード数。",
     )
     generator: RunSpec | None = Field(
         default=None,
@@ -254,6 +275,7 @@ class Resource(Model):
     )
 
 
+# 業務レコードの更新、ページ取得とHTTP障害模擬を設定する。
 class Business(Model):
     resources: list[Resource] = Field(
         default_factory=lambda: [Resource()],
@@ -305,6 +327,7 @@ class Business(Model):
     )
 
 
+# 時系列タグ、サンプル間隔、品質・欠測と保持期間を設定する。
 class History(Model):
     tags: list[str] = Field(
         default_factory=lambda: ["value"],
@@ -312,7 +335,9 @@ class History(Model):
         max_length=100,
         description="保存する生成項目。タグ名はdevice-001.value等になります。",
     )
-    devices: int = Field(default=4, ge=1, le=1000, description="時系列を作る設備数。")
+    devices: int = Field(
+        default=4, ge=1, le=1000, description="時系列を作る設備数。"
+    )
     initial_samples: int = Field(
         default=1000,
         ge=0,
@@ -356,6 +381,7 @@ class History(Model):
     )
 
 
+# ログの書式、回転、重複と破損の模擬条件を定義する。
 class Logs(Model):
     format: Literal["jsonl", "plain", "rfc5424", "rfc3164"] = "rfc5424"
     facility: int = Field(
@@ -393,7 +419,10 @@ class Logs(Model):
         description="ローカルファイルのローテーション容量MiB。",
     )
     backups: int = Field(
-        default=5, ge=1, le=30, description="ローテーションで残す過去ファイル数。"
+        default=5,
+        ge=1,
+        le=30,
+        description="ローテーションで残す過去ファイル数。",
     )
     duplicate_every: int = Field(
         default=0, ge=0, description="指定件ごとに同じログを二重出力。"
@@ -405,6 +434,7 @@ class Logs(Model):
     )
 
 
+# タグ・読取機・作業者と識別イベント異常を定義する。
 class Identification(Model):
     tags: int = Field(
         default=100,
@@ -413,7 +443,12 @@ class Identification(Model):
         description="模擬タグ・品目の種類数。同じタグが複数読取機を通過します。",
     )
     readers: list[str] = Field(
-        default_factory=lambda: ["GATE-IN", "ASSEMBLY", "INSPECTION", "GATE-OUT"],
+        default_factory=lambda: [
+            "GATE-IN",
+            "ASSEMBLY",
+            "INSPECTION",
+            "GATE-OUT",
+        ],
         min_length=1,
         max_length=100,
         description="通過順に並べた読取機・工程・ゾーン名。",
@@ -436,17 +471,22 @@ class Identification(Model):
         description="指定件ごとにイベントを生成結果から落とし、読取漏れを再現。",
     )
     wrong_reader_every: int = Field(
-        default=0, ge=0, description="指定件ごとに予定外の読取機名を出力します。"
+        default=0,
+        ge=0,
+        description="指定件ごとに予定外の読取機名を出力します。",
     )
     unauthorized_every: int = Field(
         default=0, ge=0, description="指定件ごとに未登録作業者を出力します。"
     )
 
 
+# 共通生成設定と各ソース固有の条件、実行周期・資源上限を束ねる。
 class Spec(Model):
     version: Literal[1] = 1
     name: str = Field(
-        default="小さく試す", max_length=120, description="設定・プリセットの表示名。"
+        default="小さく試す",
+        max_length=120,
+        description="設定・プリセットの表示名。",
     )
     description: str = Field(
         default="",
@@ -494,19 +534,28 @@ class Spec(Model):
 
     @model_validator(mode="after")
     def bounded(self):
+        """コレクション名の一意性と初期履歴200万点の上限を検証する。"""
         if len({r.name for r in self.business.resources}) != len(
             self.business.resources
         ):
             raise ValueError("コレクション名は重複できません")
         if (
-            self.history.initial_samples * self.history.devices * len(self.history.tags)
+            self.history.initial_samples
+            * self.history.devices
+            * len(self.history.tags)
             > 2000000
         ):
             raise ValueError("初期履歴は合計200万点以下にしてください")
         return self
 
 
-SECRETS = {"password", "token", "opc_password", "output_password", "output_token"}
+SECRETS = {
+    "password",
+    "token",
+    "opc_password",
+    "output_password",
+    "output_token",
+}
 TITLES = {
     "equipment": "OPC UA / Modbus 設備模擬",
     "api": "MES / ERP 業務API模擬",

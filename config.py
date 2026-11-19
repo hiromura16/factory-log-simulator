@@ -1,4 +1,7 @@
-"""Versioned, domain-independent connection and generation contracts."""
+"""共通データ生成と接続設定の入力契約を定義する。
+
+モデルの説明は生成JSON Schemaへ波及するため、クラスの解説はコメントに置く。
+"""
 
 from __future__ import annotations
 
@@ -25,18 +28,35 @@ SECRET_FIELDS = (
     "ssh_key_password",
     "nats_token",
 )
-DATABASE_KINDS = {"sqlserver", "oracle", "postgresql", "mysql", "mariadb", "sqlite"}
+DATABASE_KINDS = {
+    "sqlserver",
+    "oracle",
+    "postgresql",
+    "mysql",
+    "mariadb",
+    "sqlite",
+}
 ALLOWED_KINDS = {
     "sql": DATABASE_KINDS,
     "files": {"local", "s3", "smb", "nfs", "ftp", "sftp"},
-    "stream": {"mqtt", "http", "capture", "kafka", "amqp", "nats", "websocket"},
+    "stream": {
+        "mqtt",
+        "http",
+        "capture",
+        "kafka",
+        "amqp",
+        "nats",
+        "websocket",
+    },
 }
 
 
+# 余分な入力項目と非有限数を拒否する共通の入力モデル。
 class Model(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
+# 接続方式・認証・TLS・配送条件をまとめる版付きの接続契約。
 class ConnectionProfile(Model):
     id: str = Field(pattern=PROFILE_ID)
     name: str = Field(min_length=1, max_length=120)
@@ -80,12 +100,16 @@ class ConnectionProfile(Model):
         "entra_managed_identity",
         "access_token",
     ] = "password"
-    connection_method: Literal["host", "dsn", "service", "unix_socket", "raw"] = "host"
+    connection_method: Literal[
+        "host", "dsn", "service", "unix_socket", "raw"
+    ] = "host"
     domain: str = Field(default="", max_length=255)
     dsn: str = Field(default="", max_length=255)
     connection_string: SecretStr | None = None
     db_access_token: SecretStr | None = None
-    odbc_driver: str = Field(default="ODBC Driver 18 for SQL Server", max_length=128)
+    odbc_driver: str = Field(
+        default="ODBC Driver 18 for SQL Server", max_length=128
+    )
     unix_socket: str = Field(default="", max_length=1024)
     config_dir: str = Field(default="", max_length=1024)
     wallet_location: str = Field(default="", max_length=1024)
@@ -98,21 +122,25 @@ class ConnectionProfile(Model):
         default_factory=dict, max_length=30
     )
     share: str = Field(default="", max_length=255)
-    file_auth: Literal["password", "kerberos", "ssh_key", "anonymous"] = "password"
+    file_auth: Literal["password", "kerberos", "ssh_key", "anonymous"] = (
+        "password"
+    )
     ssh_private_key: SecretStr | None = None
     ssh_key_password: SecretStr | None = None
     ssh_key_file: str = Field(default="", max_length=1024)
     ssh_known_hosts: str = Field(default="", max_length=1024)
-    ssh_host_key_policy: Literal["known_hosts", "sha256", "accept_any"] = "known_hosts"
+    ssh_host_key_policy: Literal["known_hosts", "sha256", "accept_any"] = (
+        "known_hosts"
+    )
     ssh_host_key_sha256: str = Field(default="", max_length=128)
     ftp_tls_mode: Literal["explicit", "implicit"] = "explicit"
     ftp_passive: bool = True
     ftp_encoding: str = Field(default="utf-8", max_length=64)
     smb_encrypt: bool = True
     nfs_expected_source: str = Field(default="", max_length=1024)
-    kafka_sasl_mechanism: Literal["none", "PLAIN", "SCRAM-SHA-256", "SCRAM-SHA-512"] = (
-        "none"
-    )
+    kafka_sasl_mechanism: Literal[
+        "none", "PLAIN", "SCRAM-SHA-256", "SCRAM-SHA-512"
+    ] = "none"
     bootstrap_servers: str = Field(default="", max_length=2048)
     amqp_virtual_host: str = Field(default="/", max_length=255)
     amqp_exchange: str = Field(default="", max_length=255)
@@ -120,7 +148,9 @@ class ConnectionProfile(Model):
     nats_token: SecretStr | None = None
     nats_credentials_file: str = Field(default="", max_length=1024)
     nats_jetstream: bool = False
-    websocket_subprotocols: list[str] = Field(default_factory=list, max_length=20)
+    websocket_subprotocols: list[str] = Field(
+        default_factory=list, max_length=20
+    )
     websocket_ack: Literal["none", "text", "json"] = "none"
     host: str = Field(default="", max_length=255)
     port: int | None = Field(default=None, ge=1, le=65535)
@@ -143,7 +173,9 @@ class ConnectionProfile(Model):
     auth_mode: Literal["none", "basic", "bearer", "api_key"] = "none"
     bearer_token: SecretStr | None = None
     api_key: SecretStr | None = None
-    api_key_header: str = Field(default="X-API-Key", pattern=r"^[A-Za-z0-9-]{1,64}$")
+    api_key_header: str = Field(
+        default="X-API-Key", pattern=r"^[A-Za-z0-9-]{1,64}$"
+    )
     topic: str = Field(default="data/events", min_length=1, max_length=512)
     qos: int = Field(default=1, ge=0, le=2)
     mqtt_version: Literal["3.1.1", "5"] = "3.1.1"
@@ -151,8 +183,12 @@ class ConnectionProfile(Model):
     keepalive: int = Field(default=30, ge=5, le=3600)
     retain: bool = False
     http_method: Literal["POST", "PUT", "PATCH"] = "POST"
-    content_type: str = Field(default="", max_length=128, pattern=r"^[^\r\n]*$")
-    headers: dict[str, SecretStr | None] = Field(default_factory=dict, max_length=30)
+    content_type: str = Field(
+        default="", max_length=128, pattern=r"^[^\r\n]*$"
+    )
+    headers: dict[str, SecretStr | None] = Field(
+        default_factory=dict, max_length=30
+    )
     delivery_attempts: int = Field(default=1, ge=1, le=10)
     retry_backoff_ms: int = Field(default=500, ge=0, le=60000)
     timeout_seconds: int = Field(default=15, ge=1, le=120)
@@ -160,6 +196,7 @@ class ConnectionProfile(Model):
 
     @model_validator(mode="after")
     def valid_destination(self):
+        """接続種別ごとの必須項目、認証方式、URLと秘密値の組合せを検証する。"""
         if (
             (
                 self.kind in DATABASE_KINDS - {"sqlite"}
@@ -177,7 +214,9 @@ class ConnectionProfile(Model):
         ):
             raise ValueError("Oracleのサービス名またはSIDが必要です")
         if self.service_name and self.sid:
-            raise ValueError("Oracleのサービス名とSIDはどちらか一方を指定してください")
+            raise ValueError(
+                "Oracleのサービス名とSIDはどちらか一方を指定してください"
+            )
         if (
             self.kind in {"sqlserver", "postgresql", "mysql", "mariadb"}
             and not self.database
@@ -202,7 +241,9 @@ class ConnectionProfile(Model):
                     or parsed.password
                     or parsed.fragment
                 ):
-                    raise ValueError("認証情報を含まないHTTP(S) URLを指定してください")
+                    raise ValueError(
+                        "認証情報を含まないHTTP(S) URLを指定してください"
+                    )
         if self.kind == "mqtt" and (
             "\x00" in self.topic or any(c in self.topic for c in "#\n\r+")
         ):
@@ -248,8 +289,13 @@ class ConnectionProfile(Model):
                     "選択したDBに対応する認証方式・接続方法を選んでください"
                 )
             if self.connection_method in {"dsn", "service"} and not self.dsn:
-                raise ValueError("DSN・TNSエイリアスまたはサービス名を指定してください")
-            if self.connection_method == "unix_socket" and not self.unix_socket:
+                raise ValueError(
+                    "DSN・TNSエイリアスまたはサービス名を指定してください"
+                )
+            if (
+                self.connection_method == "unix_socket"
+                and not self.unix_socket
+            ):
                 raise ValueError("Unixソケットのパスを指定してください")
         if self.kind == "smb" and not self.share:
             raise ValueError("SMB共有名を指定してください")
@@ -267,7 +313,9 @@ class ConnectionProfile(Model):
         import re
 
         for name in self.headers:
-            if not re.fullmatch(r"[A-Za-z0-9-]{1,64}", name) or name.lower() in {
+            if not re.fullmatch(
+                r"[A-Za-z0-9-]{1,64}", name
+            ) or name.lower() in {
                 "authorization",
                 "cookie",
                 "proxy-authorization",
@@ -280,6 +328,7 @@ class ConnectionProfile(Model):
         return self
 
 
+# 生成済み項目の比較結果に応じて値を置き換える条件。
 class Condition(Model):
     field: str = Field(pattern=IDENTIFIER)
     operator: Literal["eq", "ne", "gt", "ge", "lt", "le", "in"] = "eq"
@@ -287,6 +336,7 @@ class Condition(Model):
     then_value: Any = None
 
 
+# 一項目の型・生成方法・依存関係とNULL率を定義する。
 class FieldRule(Model):
     name: str = Field(pattern=IDENTIFIER)
     data_type: Literal[
@@ -333,24 +383,28 @@ class FieldRule(Model):
 
     @model_validator(mode="after")
     def valid_rule(self):
+        """精度・主キーNULL・参照元の整合性を検証する。"""
         if self.scale > self.precision:
             raise ValueError("小数桁数は精度以下にしてください")
         if self.primary_key and self.null_probability:
             raise ValueError("主キーにNULL率は指定できません")
         if (
-            self.generator in {"reference", "sum", "difference", "product", "ratio"}
+            self.generator
+            in {"reference", "sum", "difference", "product", "ratio"}
             and not self.sources
         ):
             raise ValueError("参照元の項目が必要です")
         return self
 
 
+# SQL出力の対象表と操作種別を定義する。
 class SqlOptions(Model):
     schema_name: str = Field(default="", pattern=r"^$|" + IDENTIFIER)
     table: str = Field(default="sample_records", pattern=IDENTIFIER)
     operation: Literal["insert", "upsert", "update", "delete"] = "upsert"
 
 
+# 模擬画像の寸法・模様・ノイズと欠陥条件を定義する。
 class ImageOptions(Model):
     width: int = Field(default=320, ge=32, le=4096)
     height: int = Field(default=240, ge=32, le=4096)
@@ -365,9 +419,12 @@ class ImageOptions(Model):
     defect_color: str = Field(default="#ef463c", pattern=r"^#[0-9A-Fa-f]{6}$")
 
 
+# ファイル分割・名前・書式・圧縮と画像出力をまとめる。
 class FileOptions(Model):
     formats: list[Literal["json", "csv", "image"]] = Field(
-        default_factory=lambda: ["json", "csv", "image"], min_length=1, max_length=3
+        default_factory=lambda: ["json", "csv", "image"],
+        min_length=1,
+        max_length=3,
     )
     records_per_file: int = Field(default=100, ge=1, le=10000)
     path_template: str = Field(default="{run_key}/{job_id}", max_length=512)
@@ -390,6 +447,7 @@ class FileOptions(Model):
     image: ImageOptions = Field(default_factory=ImageOptions)
 
 
+# ストリーム本文・包絡・配送再試行の設定を定義する。
 class StreamOptions(Model):
     envelope: bool = True
     metadata_key: str = Field(default="_source", pattern=IDENTIFIER)
@@ -401,9 +459,14 @@ class StreamOptions(Model):
 
 
 def default_fields():
+    """既定の識別子・連番・状態・計測値・時刻の生成項目を新しく作る。"""
     return [
-        FieldRule(name="id", generator="record_id", primary_key=True, length=64),
-        FieldRule(name="sequence_no", data_type="integer", generator="sequence"),
+        FieldRule(
+            name="id", generator="record_id", primary_key=True, length=64
+        ),
+        FieldRule(
+            name="sequence_no", data_type="integer", generator="sequence"
+        ),
         FieldRule(
             name="entity_no",
             data_type="integer",
@@ -417,7 +480,9 @@ def default_fields():
             template="ENTITY-{entity_no:05d}",
             length=64,
         ),
-        FieldRule(name="status", generator="choice", choices="$statuses", length=32),
+        FieldRule(
+            name="status", generator="choice", choices="$statuses", length=32
+        ),
         FieldRule(
             name="value",
             data_type="number",
@@ -435,12 +500,14 @@ def default_fields():
     ]
 
 
+# 異常適用対象を選ぶ項目比較の条件。
 class Predicate(Model):
     field: str = Field(pattern=IDENTIFIER)
     operator: Literal["eq", "ne", "gt", "ge", "lt", "le", "in"] = "eq"
     value: Any = None
 
 
+# 行範囲・確率・周期と操作を指定する異常注入ルール。
 class AnomalyRule(Model):
     name: str = Field(default="異常注入", min_length=1, max_length=120)
     enabled: bool = True
@@ -466,11 +533,13 @@ class AnomalyRule(Model):
 
     @model_validator(mode="after")
     def valid_range(self):
+        """異常の終了位置が開始位置より前にならないことを確認する。"""
         if self.to_row is not None and self.to_row < self.from_row:
             raise ValueError("異常終了位置は開始位置以上にしてください")
         return self
 
 
+# バッチ境界の遅延・失敗と成果物破損の模擬条件を定義する。
 class FaultOptions(Model):
     enabled: bool = False
     stage: Literal["before_batch", "after_write"] = "before_batch"
@@ -490,6 +559,7 @@ class FaultOptions(Model):
     ] = "none"
 
 
+# 生成量・速度・項目定義・出力条件と異常設定を束ねる実行契約。
 class RunSpec(Model):
     version: Literal[2] = 2
     name: str = Field(default="カスタムデータ", min_length=1, max_length=120)
@@ -530,17 +600,21 @@ class RunSpec(Model):
 
     @property
     def cycles(self):
+        """行数を既存の呼出側向けの周期数として返す。"""
         return self.rows
 
     @model_validator(mode="after")
     def valid_dataset(self):
+        """項目名とメタ情報キーの衝突、パラメーターの非有限数を拒否する。"""
         names = [f.name.casefold() for f in self.fields]
         if len(set(names)) != len(names):
             raise ValueError("項目名は重複できません")
         if self.stream.envelope and self.stream.metadata_key in {
             f.name for f in self.fields
         }:
-            raise ValueError("ストリームのメタデータ名と生成項目名が重複しています")
+            raise ValueError(
+                "ストリームのメタデータ名と生成項目名が重複しています"
+            )
         for value in self.parameters.values():
             if isinstance(value, float) and not math.isfinite(value):
                 raise ValueError("パラメーターには有限の数を指定してください")

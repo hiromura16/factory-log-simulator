@@ -1,3 +1,4 @@
+# Python対象バージョン・依存関係・テスト探索条件。インストール時はuv.lockと合わせて使う。
 [project]
 name = "factory-log-simulator"
 version = "0.1.0"

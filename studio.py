@@ -1,4 +1,7 @@
-"""Source studio with generic schema forms and durable configuration."""
+"""共通の管理画面、設定保存、取得APIの認証と実行状態を組み立てる。
+
+ルートと入力モデルにはコメントを使い、公開スキーマへの説明追加を避ける。
+"""
 
 import base64
 import hmac
@@ -10,7 +13,12 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
+from fastapi.responses import (
+    FileResponse,
+    JSONResponse,
+    PlainTextResponse,
+    Response,
+)
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from models import Profile, Spec, TITLES, SECRETS
@@ -19,6 +27,7 @@ from store import Store
 from controller import Controller
 
 
+# 接続ファイル取込の名前とBase64本文を制限する入力契約。
 class Upload(BaseModel):
     name: str = Field(
         pattern=r"^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+){0,3}$", max_length=160
@@ -27,9 +36,13 @@ class Upload(BaseModel):
 
 
 def schemas(kind):
+    """アプリ種類に応じた表示用スキーマを作り、非該当の項目を画面から隠す。"""
     from helptext import HELP
 
-    result = {"spec": Spec.model_json_schema(), "profile": Profile.model_json_schema()}
+    result = {
+        "spec": Spec.model_json_schema(),
+        "profile": Profile.model_json_schema(),
+    }
     translations = {
         "generator": "任意項目とデータ異常",
         "equipment": "設備プロトコル設定",
@@ -65,6 +78,7 @@ def schemas(kind):
     }
 
     def annotate(schema):
+        """既存説明を尊重しながら、日本語の項目名と補助説明を再帰的に付ける。"""
         for name, prop in schema.get("properties", {}).items():
             if name in translations:
                 prop["title"] = translations[name]
@@ -92,14 +106,23 @@ def schemas(kind):
     for name, definition in result["spec"].get("$defs", {}).items():
         for field, prop in definition.get("properties", {}).items():
             for annotation in ["title", "description"]:
-                source = prior.get(name, {}).get("properties", {}).get(field, {})
+                source = (
+                    prior.get(name, {}).get("properties", {}).get(field, {})
+                )
                 if annotation in source:
                     prop[annotation] = source[annotation]
-    result["spec"]["$defs"]["FieldRule"]["properties"]["primary_key"]["ui_hidden"] = (
-        True
-    )
+    result["spec"]["$defs"]["FieldRule"]["properties"]["primary_key"][
+        "ui_hidden"
+    ] = True
     gen = result["spec"]["$defs"]["RunSpec"]["properties"]
-    visible = {"run_key", "seed", "parameters", "fields", "anomalies", "start_sequence"}
+    visible = {
+        "run_key",
+        "seed",
+        "parameters",
+        "fields",
+        "anomalies",
+        "start_sequence",
+    }
     for name, prop in gen.items():
         prop["ui_hidden"] = name not in visible
     for name in ["equipment", "business", "history", "logs", "identification"]:
@@ -143,7 +166,14 @@ def schemas(kind):
         },
         "api": {"allow_writes"},
         "historian": set(),
-        "logs": {"output", "host", "port", "tls_verify", "ca_file", "timeout_seconds"},
+        "logs": {
+            "output",
+            "host",
+            "port",
+            "tls_verify",
+            "ca_file",
+            "timeout_seconds",
+        },
         "identification": {
             "output",
             "host",
@@ -171,13 +201,16 @@ def schemas(kind):
 
 
 def create_app(kind):
+    """保存領域・コントローラー・認証・管理ルートを一つのFastAPIアプリへ束ねる。"""
     root = Path(__file__).resolve().parent
     store = Store(os.environ.get("DATA_DIR", "./data"))
     controller = Controller(kind, store)
     try:
         store.profile()
     except KeyError:
-        store.save_profile(Profile(output="file" if kind == "logs" else "capture"))
+        store.save_profile(
+            Profile(output="file" if kind == "logs" else "capture")
+        )
     if kind == "equipment":
         for identity, label, opc, modbus in [
             ("opc-only", "OPC UAのみ", True, False),
@@ -188,13 +221,17 @@ def create_app(kind):
             except KeyError:
                 store.save_profile(
                     Profile(
-                        id=identity, name=label, opc_enabled=opc, modbus_enabled=modbus
+                        id=identity,
+                        name=label,
+                        opc_enabled=opc,
+                        modbus_enabled=modbus,
                     )
                 )
     store.seed(root / "presets")
 
     @asynccontextmanager
     async def lifespan(app):
+        """保存した希望状態に従って再開し、終了時は希望状態を変更せずスレッドを止める。"""
         desired = store.meta("desired")
         if desired and desired.get("running") and desired.get("spec"):
             controller.start(
@@ -206,7 +243,7 @@ def create_app(kind):
                 Spec.model_validate(defaults["spec"]) if defaults else Spec()
             )
         yield
-        # Shutdown preserves the user's desired running/stopped state.
+        # 終了時には利用者が指定した実行・停止の希望状態を変更せず保持する。
         controller.stop_event.set()
         if controller.thread:
             await __import__("asyncio").to_thread(controller.thread.join, 15)
@@ -215,6 +252,7 @@ def create_app(kind):
     app.state.controller = controller
     app.state.store = store
 
+    # 入力エラーから位置・種類・説明だけを返し、生の入力値は含めない。
     @app.exception_handler(RequestValidationError)
     async def invalid(request, exc):
         return JSONResponse(
@@ -227,10 +265,12 @@ def create_app(kind):
             422,
         )
 
+    # 入力値の制約違反を422応答へ変換する。
     @app.exception_handler(ValueError)
     async def invalid_value(request, exc):
         return JSONResponse({"detail": str(exc)}, 422)
 
+    # 変更系要求のOrigin・JSON形式・容量を検査し、共通の応答ヘッダーを付ける。
     @app.middleware("http")
     async def protect(request, call_next):
         if request.method not in {"GET", "HEAD", "OPTIONS"}:
@@ -246,9 +286,13 @@ def create_app(kind):
                 request.headers.get("content-type", "").split(";")[0]
                 != "application/json"
             ):
-                return JSONResponse({"detail": "application/jsonが必要です"}, 415)
+                return JSONResponse(
+                    {"detail": "application/jsonが必要です"}, 415
+                )
             if len(await request.body()) > 2 * 1024**2:
-                return JSONResponse({"detail": "JSONは2MiB以下にしてください"}, 413)
+                return JSONResponse(
+                    {"detail": "JSONは2MiB以下にしてください"}, 413
+                )
         result = await call_next(request)
         result.headers.update(
             {
@@ -260,6 +304,10 @@ def create_app(kind):
         return result
 
     def authorize(request):
+        """取得APIのnone・Basic・Bearer・APIキー認証を評価する。
+
+        管理画面全体のログイン制御ではない。秘密値比較には定数時間比較を使う。
+        """
         p = controller.profile or store.profile()[0]
         mode = p.auth_mode
         ok = mode == "none"
@@ -267,12 +315,17 @@ def create_app(kind):
             try:
                 ok = (
                     bool(p.password)
-                    and request.headers.get("authorization", "").startswith("Basic ")
+                    and request.headers.get("authorization", "").startswith(
+                        "Basic "
+                    )
                     and hmac.compare_digest(
                         base64.b64decode(
-                            request.headers.get("authorization", "")[6:], validate=True
+                            request.headers.get("authorization", "")[6:],
+                            validate=True,
                         ),
-                        (p.username + ":" + p.password.get_secret_value()).encode(),
+                        (
+                            p.username + ":" + p.password.get_secret_value()
+                        ).encode(),
                     )
                 )
             except Exception:
@@ -284,7 +337,8 @@ def create_app(kind):
             )
         elif mode == "api_key":
             ok = bool(p.token) and hmac.compare_digest(
-                request.headers.get("x-api-key", ""), p.token.get_secret_value()
+                request.headers.get("x-api-key", ""),
+                p.token.get_secret_value(),
             )
         if not ok:
             raise HTTPException(
@@ -297,14 +351,17 @@ def create_app(kind):
 
     app.mount("/static", StaticFiles(directory=root / "static"), name="static")
 
+    # 静的な管理画面の入口を返す。
     @app.get("/")
     def index():
         return FileResponse(root / "static/index.html")
 
+    # プロセスの応答状態とサービス種類を返す。
     @app.get("/healthz")
     def health():
         return {"status": "ok", "service": kind, "version": "0.1.0"}
 
+    # 種類別の接続先案内、表示スキーマ、既定設定を返す。
     @app.get("/api/info")
     def info():
         return {
@@ -332,14 +389,17 @@ def create_app(kind):
             }[kind],
         }
 
+    # コントローラーの現在状態を取得する。
     @app.get("/api/state")
     def state():
         return controller.snapshot()
 
+    # 秘密値を除いた保存プロファイル一覧を返す。
     @app.get("/api/profiles")
     def profiles():
         return {"profiles": store.profiles()}
 
+    # アプリ種類ごとの出力方式と接続先を検証してプロファイルを保存する。
     @app.post("/api/profiles")
     def profile(p: Profile):
         if set(p.clear_secrets) - SECRETS:
@@ -358,21 +418,35 @@ def create_app(kind):
                 or value.username
                 or value.password
             ):
-                raise HTTPException(422, "認証を含まないHTTP(S) URLを指定してください")
-        if kind == "logs" and p.output not in {"capture", "file", "udp", "tcp", "tls"}:
+                raise HTTPException(
+                    422, "認証を含まないHTTP(S) URLを指定してください"
+                )
+        if kind == "logs" and p.output not in {
+            "capture",
+            "file",
+            "udp",
+            "tcp",
+            "tls",
+        }:
             raise HTTPException(
                 422, "ログはfile/capture/UDP/TCP/TLSから選択してください"
             )
-        if kind == "identification" and p.output not in {"capture", "mqtt", "http"}:
+        if kind == "identification" and p.output not in {
+            "capture",
+            "mqtt",
+            "http",
+        }:
             raise HTTPException(
                 422, "識別イベントはcapture/MQTT/HTTPから選択してください"
             )
         return store.save_profile(p)
 
+    # 保存済みの実行プリセット一覧を返す。
     @app.get("/api/presets")
     def presets():
         return {"presets": store.presets()}
 
+    # 指定IDのプリセットを検証済み設定で保存する。
     @app.post("/api/presets/{identity}")
     def preset(identity: str, spec: Spec):
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", identity):
@@ -380,6 +454,7 @@ def create_app(kind):
         validate_generation(spec.generator)
         return store.save_preset(identity, spec)
 
+    # 境界サンプルを生成し、実行を始めずにデータと異常の影響を確認する。
     @app.post("/api/preview")
     def preview(spec: Spec):
         validate_generation(spec.generator)
@@ -389,7 +464,9 @@ def create_app(kind):
         for offset in offsets:
             trace = []
             row = generate_record(
-                spec.generator, spec.generator.start_sequence + offset, trace=trace
+                spec.generator,
+                spec.generator.start_sequence + offset,
+                trace=trace,
             )
             if kind in {"logs", "identification"}:
                 from drivers import EventDriver
@@ -410,6 +487,7 @@ def create_app(kind):
             "validated_spec": spec.model_dump(mode="json"),
         }
 
+    # 設定をコントローラーへ渡してバックグラウンド実行を開始する。
     @app.post("/api/start")
     def start(spec: Spec):
         try:
@@ -417,14 +495,17 @@ def create_app(kind):
         except RuntimeError as e:
             raise HTTPException(409, str(e)) from None
 
+    # 停止を要求し、停止待ちを含む現在状態を返す。
     @app.post("/api/stop")
     def stop():
         return controller.stop()
 
+    # 実行状態のカウンターをPrometheus向けテキストで返す。
     @app.get("/metrics", response_class=PlainTextResponse)
     def metrics():
         return f'source_ticks{{kind="{kind}"}} {controller.tick}\nsource_records{{kind="{kind}"}} {controller.produced}\n'
 
+    # 接続専用領域に制限してファイルを排他的に作り、原子的に置き換える。
     @app.post("/api/connection-files")
     def upload(value: Upload):
         folder = store.root / "connection-files"
@@ -451,6 +532,7 @@ def create_app(kind):
         os.replace(temp, target)
         return {"name": value.name, "bytes": len(data), "permissions": "600"}
 
+    # 取得認証後に、任意の配送状態で絞った最近のイベントを返す。
     @app.get("/source/events")
     def events(request: Request, limit: int = 100, status: str | None = None):
         authorize(request)
@@ -467,6 +549,7 @@ def create_app(kind):
             ).fetchall()
         return {"events": [dict(r) for r in rows]}
 
+    # 取得認証後に、上限内のログ本文を時系列順のテキストとして返す。
     @app.get("/source/logs/download")
     def logs(request: Request, limit: int = 1000):
         authorize(request)
@@ -474,13 +557,15 @@ def create_app(kind):
             raise HTTPException(422, "limitは1〜10000")
         with store.db() as db:
             rows = db.execute(
-                "SELECT payload FROM events ORDER BY seq DESC LIMIT ?", (limit,)
+                "SELECT payload FROM events ORDER BY seq DESC LIMIT ?",
+                (limit,),
             ).fetchall()
         return Response(
             "\n".join(r[0] for r in reversed(rows)) + "\n",
             media_type="text/plain; charset=utf-8",
         )
 
+    # 識別タグの範囲と形式を確認し、バーコードまたはQRのPNGを返す。
     @app.get("/source/labels/{number}.png")
     def label(request: Request, number: int, format: str = ""):
         authorize(request)
@@ -503,7 +588,9 @@ def create_app(kind):
             import barcode
             from barcode.writer import ImageWriter
 
-            value = f"{490000000000 + number:012d}" if mode == "ean13" else text
+            value = (
+                f"{490000000000 + number:012d}" if mode == "ean13" else text
+            )
             barcode.get(mode, value, writer=ImageWriter()).write(output)
         else:
             raise HTTPException(422, "code128/ean13/qrから選択してください")

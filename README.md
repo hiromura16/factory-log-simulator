@@ -1,5 +1,7 @@
 # ログ発生器 / 回転ファイル・Syslog
 
+[コードの読み方とデータの流れ（日本語解説）](docs/code-reading-guide.md)
+
 設備・MES・アプリケーションの疑似ログを作成し、収集・パース・再送を試験します。
 
 - 形式: JSON Lines、プレーン、RFC5424、RFC3164。facility / severity / host / app / メッセージテンプレートを編集。

@@ -1,3 +1,5 @@
+"""スタジオと取得APIをHTTPクライアント経由で検証する。"""
+
 import json
 import time
 from fastapi.testclient import TestClient
@@ -8,6 +10,11 @@ from config import FieldRule
 
 
 def wait(c):
+    """開始処理中を抜けた状態を取得する。
+
+    テストクライアントから最大200回問い合わせ、開始中以外の
+    最初の応答を返す。遷移しなければAssertionErrorで失敗させる。
+    """
     for _ in range(200):
         s = c.get("/api/state").json()
         if s["status"] != "starting":
@@ -17,15 +24,26 @@ def wait(c):
 
 
 def test_profiles_secrets_presets_without_login(tmp_path):
+    """秘密値が公開設定とDBの平文に出ないことを確かめる。
+
+    秘密値省略時の既存値の保持と履歴取得も確認する。HTTP側では
+    初期状態での閲覧、外部Originの拒否、入力エラー時の秘密値の
+    非表示、プレビューとプリセットの保存を確認する。
+    """
     store = Store(tmp_path / "vault")
-    store.save_profile(Profile(password="actual-test-private-value", auth_mode="basic"))
+    store.save_profile(
+        Profile(password="actual-test-private-value", auth_mode="basic")
+    )
     assert "actual-test-private-value" not in json.dumps(store.profiles())
     assert (
         b"actual-test-private-value"
         not in (tmp_path / "vault/settings.sqlite3").read_bytes()
     )
     store.save_profile(Profile(auth_mode="basic"))
-    assert store.profile()[0].password.get_secret_value() == "actual-test-private-value"
+    assert (
+        store.profile()[0].password.get_secret_value()
+        == "actual-test-private-value"
+    )
     assert store.profile(revision=1)[1] == 1
     app = create_app("api")
     with TestClient(app) as c:
@@ -40,40 +58,55 @@ def test_profiles_secrets_presets_without_login(tmp_path):
             ).status_code
             == 403
         )
-        r = c.post("/api/profiles", json={"password": "must-not-echo", "port": -1})
+        r = c.post(
+            "/api/profiles", json={"password": "must-not-echo", "port": -1}
+        )
         assert r.status_code == 422 and "must-not-echo" not in r.text
         spec = Spec(name="custom")
         spec.generator.fields = [
             FieldRule(name="custom", generator="constant", value="自由な値")
         ]
         assert (
-            c.post("/api/preview", json=spec.model_dump(mode="json")).json()["records"][
-                0
-            ]["custom"]
+            c.post("/api/preview", json=spec.model_dump(mode="json")).json()[
+                "records"
+            ][0]["custom"]
             == "自由な値"
         )
         assert (
-            c.post("/api/presets/custom", json=spec.model_dump(mode="json")).status_code
+            c.post(
+                "/api/presets/custom", json=spec.model_dump(mode="json")
+            ).status_code
             == 200
         )
-        assert any(p["id"] == "custom" for p in c.get("/api/presets").json()["presets"])
+        assert any(
+            p["id"] == "custom"
+            for p in c.get("/api/presets").json()["presets"]
+        )
 
 
 def test_snapshot_pages_filter_delta_and_source_auth():
+    """ページ取得と差分取得の境界を検証する。
+
+    取得途中に行を更新し、ページに重複がなく、更新が差分に現れる
+    ことを確認する。ODataの取得条件、許可外のフィルター構文と
+    改変トークンの拒否、Bearer認証の有無による応答も検証する。
+    """
     app = create_app("api")
     with TestClient(app) as c:
         spec = Spec(max_ticks=1)
         spec.business.resources = [Resource(name="orders", rows=12)]
         spec.business.updates_per_tick = 0
         assert (
-            c.post("/api/start", json=spec.model_dump(mode="json")).status_code == 200
+            c.post("/api/start", json=spec.model_dump(mode="json")).status_code
+            == 200
         )
         assert wait(c)["status"] in {"running", "stopped"}
         first = c.get("/source/rest/orders?limit=5").json()
         assert len(first["value"]) == 5 and first["count"] == 12
         second = c.get(first["next"]).json()
         assert not (
-            {v["id"] for v in first["value"]} & {v["id"] for v in second["value"]}
+            {v["id"] for v in first["value"]}
+            & {v["id"] for v in second["value"]}
         )
         controller = app.state.controller
         row = {**first["value"][0], "value": 999}
@@ -104,9 +137,9 @@ def test_snapshot_pages_filter_delta_and_source_auth():
         c.post("/api/stop", json={})
         c.post(
             "/api/profiles",
-            json=Profile(auth_mode="bearer", token="source-test-token").model_dump(
-                mode="json"
-            )
+            json=Profile(
+                auth_mode="bearer", token="source-test-token"
+            ).model_dump(mode="json")
             | {"token": "source-test-token"},
         )
         c.post("/api/start", json=spec.model_dump(mode="json"))
@@ -123,6 +156,12 @@ def test_snapshot_pages_filter_delta_and_source_auth():
 
 
 def test_historian_raw_aggregate_gap_and_resume():
+    """欠測を含む履歴から生データと時間集約を取得する。
+
+    一定値でサンプルを生成し、欠測で件数が減ることと、時間集約が
+    平均値またはnullを返すことを確かめる。日時として不完全な
+    入力は422になることも検証する。
+    """
     app = create_app("historian")
     with TestClient(app) as c:
         s = Spec(max_ticks=1)
@@ -134,7 +173,8 @@ def test_historian_raw_aggregate_gap_and_resume():
         c.post("/api/start", json=s.model_dump(mode="json"))
         assert wait(c)["status"] in {"running", "stopped"}
         rows = c.get(
-            "/source/history/raw", params={"tag": "device-001.value", "limit": 100}
+            "/source/history/raw",
+            params={"tag": "device-001.value", "limit": 100},
         ).json()["values"]
         assert 5 < len(rows) < 11
         q = {
@@ -160,6 +200,7 @@ def test_historian_raw_aggregate_gap_and_resume():
 
 
 def test_fault_response_and_builtins():
+    """制限の模擬設定が429と再試行までの秒数を返すか検証する。"""
     app = create_app("api")
     with TestClient(app) as c:
         s = Spec(max_ticks=1)
@@ -173,9 +214,20 @@ def test_fault_response_and_builtins():
 
 
 def test_missing_source_credentials_are_rejected_before_start():
+    """認証方法だけを選んだ接続設定が保存されないか検証する。
+
+    Basic・Bearer・APIキーで必須の秘密値を省略し、422になり、
+    保存済みプロファイルと停止状態が維持されることを確かめる。
+    """
     app = create_app("api")
     with TestClient(app) as c:
         for mode in ["basic", "bearer", "api_key"]:
-            assert c.post("/api/profiles", json={"auth_mode": mode}).status_code == 422
-            assert c.get("/api/profiles").json()["profiles"][0]["auth_mode"] == "none"
+            assert (
+                c.post("/api/profiles", json={"auth_mode": mode}).status_code
+                == 422
+            )
+            assert (
+                c.get("/api/profiles").json()["profiles"][0]["auth_mode"]
+                == "none"
+            )
             assert c.get("/api/state").json()["status"] == "stopped"

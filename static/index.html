@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="ja">
+  <!-- 表示骨格とDOM識別子。app.jsが値を読み書きし、style.cssが配置を決める。 -->
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -17,6 +18,7 @@
       <span id="status" class="badge">読み込み中</span>
     </header>
     <div class="layout">
+      <!-- 設定・JSON・公開先などの画面切替と、現在の文脈に応じたヘルプ。 -->
       <aside>
         <nav>
           <button data-tab="generate" class="nav active">01 設定と実行</button
