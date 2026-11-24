@@ -49,6 +49,7 @@
               <summary>選んだひな型の説明</summary>
               <p id="presetDetails" class="note"></p>
             </details>
+            <p id="editingPreset" class="editing-preset"></p>
             <form id="specForm" novalidate>
               <div id="basicEditor" class="grid"></div>
               <details id="advancedSettings">
@@ -59,7 +60,7 @@
               </details>
             </form>
           </section>
-          <section class="card" aria-labelledby="reviewTitle">
+          <section class="card preview-step" aria-labelledby="reviewTitle">
             <h3 id="reviewTitle">見本を確認</h3>
             <p class="muted">出力先に接続せず、今の設定でつくるデータを確認します。</p>
             <button id="preview" class="primary" type="button">ログの見本を見る</button>
@@ -76,7 +77,7 @@
               <pre id="result"></pre>
             </details>
           </section>
-          <section class="card" aria-labelledby="runTitle">
+          <section class="card run-step" aria-labelledby="runTitle">
             <h3 id="runTitle">実行</h3>
             <p class="muted">開始すると、選んだ設定でファイル保存または送信します。</p>
             <div class="actionbar">

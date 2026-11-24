@@ -404,6 +404,7 @@ function render() {
     batch_size: { ...batch_size, title: "1回につくるログの件数" },
   } }, spec, root);
   object(advanced, { properties: advancedOptions }, spec, root);
+  $("#editingPreset").textContent = "編集中の設定: " + (spec.name || "名称未設定");
   $("#previewResults").hidden = true;
 }
 /* 現在profileから接続設定フォームを作り直す。保存は別の操作で行う。 */
@@ -615,6 +616,7 @@ async function init() {
     );
   $("#specForm").addEventListener("submit", (event) => event.preventDefault());
   $("#specForm").addEventListener("input", () => {
+    $("#editingPreset").textContent = "編集中の設定: " + (spec.name || "名称未設定");
     $("#previewResults").hidden = true;
   });
   $("#presetSelect").onchange = description;
