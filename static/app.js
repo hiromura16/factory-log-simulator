@@ -57,6 +57,34 @@ async function api(
     );
   return v;
 }
+/* 送信しない見本として本文・フレーミング・異常をテキスト表示する。 */
+function renderLogPreview(plan) {
+  const target = $("#logPreview");
+  target.replaceChildren();
+  if (!plan) return;
+  const labels = { capture: "アプリ内記録", file: "回転ファイル", udp: "Syslog UDP", tcp: "Syslog TCP", tls: "Syslog TLS" };
+  target.append(el("p", {},
+    plan.format + " / " + (labels[plan.output] || plan.output || "出力先未登録") +
+    (plan.tcp_framing ? " / " + plan.tcp_framing : "") +
+    "。時刻は見本です。送信・保存はしていません。"));
+  for (const sample of plan.samples) {
+    target.append(el("p", { class: "muted" },
+      "連番 " + sample.sequence + " / UTF-8 " + sample.message_bytes + " バイト" +
+      (sample.wire_bytes === null ? "" : " / TCP境界込み " + sample.wire_bytes + " バイト") +
+      (sample.duplicate ? " / 重複あり" : "") + (sample.malformed ? " / 破損ヘッダー" : "")));
+    target.append(el("pre", {}, sample.payload));
+  }
+}
+
+/* 外部送信とファイル保存は確認し、確認した出力先の版だけで実行する。 */
+function confirmedStartPath() {
+  const destination = profiles.find((item) => item.id === spec.profile_id);
+  if (!destination?.revision) throw new Error("登録済み出力先を確認してください。");
+  if (destination.output !== "capture" &&
+      !window.confirm("「" + destination.name + "」(" + destination.id + "・版 " + destination.revision + ") へログを出力します。続行しますか？")) return null;
+  return "/api/start?profile_revision=" + destination.revision;
+}
+
 /* 指定ボタンへ非同期処理を登録する。処理中の二重操作を防ぎ、失敗通知とボタン復帰を共通化する。 */
 function action(
   id,
@@ -582,7 +610,10 @@ async function init() {
     "#preview",
     /* フォーム検証後にプレビュー要求を送り、レコード・異常注入結果・応答JSONを表示する。実際の開始要求は行わない。 */ async () => {
       validated("#specForm");
-      const v = await api("/api/preview", spec);
+      const submitted = JSON.stringify(spec);
+      const v = await api("/api/preview", JSON.parse(submitted));
+      if (submitted !== JSON.stringify(spec)) return;
+      renderLogPreview(v.log_preview);
       table(
         $("#previewTable"),
         v.records.map(
@@ -603,7 +634,9 @@ async function init() {
     "#start",
     /* フォーム検証後に開始要求を送信し、状態を再取得して通知する。失敗は共通action処理が表示する。 */ async () => {
       validated("#specForm");
-      await api("/api/start", spec);
+      const path = confirmedStartPath();
+      if (!path) return;
+      await api(path, spec);
       await monitor();
       notice("開始しました。");
     },

@@ -9,9 +9,10 @@ import os
 import re
 import secrets
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import (
     FileResponse,
@@ -459,39 +460,76 @@ def create_app(kind):
     def preview(spec: Spec):
         validate_generation(spec.generator)
         offsets = sorted({0, 1, 2, *sample_offsets(spec.generator)})[:12]
-        records = []
-        hits = []
+        records, hits = [], []
+        log_preview = None
+        driver = None
+        if kind in {"logs", "identification"}:
+            from drivers import EventDriver, syslog_tcp_frame
+
+            preview_controller = Controller(kind, store)
+            preview_controller.spec = spec
+            driver = EventDriver(preview_controller)
+        if kind == "logs":
+            try:
+                profile, revision = store.profile(spec.profile_id)
+            except KeyError:
+                output, revision = None, None
+            else:
+                output = profile.output
+            log_preview = {
+                "format": spec.logs.format,
+                "profile_id": spec.profile_id,
+                "profile_revision": revision,
+                "output": output,
+                "tcp_framing": spec.logs.tcp_framing if output in {"tcp", "tls"} else None,
+                "timestamp_is_sample": True,
+                "samples": [],
+            }
         for offset in offsets:
             trace = []
-            row = generate_record(
-                spec.generator,
-                spec.generator.start_sequence + offset,
-                trace=trace,
-            )
-            if kind in {"logs", "identification"}:
-                from drivers import EventDriver
-
-                preview_controller = Controller(kind, store)
-                preview_controller.spec = spec
-                driver = EventDriver(preview_controller)
-                row = driver.event(offset)
-                if kind == "logs":
-                    row["_formatted_log"] = driver.log_message(row, offset)
+            if driver is None:
+                row = generate_record(
+                    spec.generator, spec.generator.start_sequence + offset, trace=trace
+                )
+            else:
+                row = driver.event(offset, trace=trace)
+            if log_preview is not None:
+                payload, malformed = driver.log_payload(
+                    row, offset, at=datetime(2000, 1, 1, tzinfo=timezone.utc)
+                )
+                row["_formatted_log"] = payload
+                data = payload.encode("utf-8")
+                samples = log_preview["samples"]
+                every = spec.logs.duplicate_every
+                samples.append({
+                    "sequence": offset,
+                    "payload": payload,
+                    "message_bytes": len(data),
+                    "wire_bytes": len(syslog_tcp_frame(data, spec.logs.tcp_framing))
+                    if output in {"tcp", "tls"} else None,
+                    "duplicate": bool(every and (offset + 1) % every == 0),
+                    "malformed": malformed,
+                })
             records.append(row)
             hits.append(trace)
-        return {
+        result = {
             "records": records,
             "anomaly_hits": hits,
             "sequences": offsets,
             "writes": False,
             "validated_spec": spec.model_dump(mode="json"),
         }
+        if log_preview is not None:
+            result["log_preview"] = log_preview
+        return result
 
     # 設定をコントローラーへ渡してバックグラウンド実行を開始する。
     @app.post("/api/start")
-    def start(spec: Spec):
+    def start(spec: Spec, profile_revision: int | None = Query(default=None, ge=1)):
         try:
-            return controller.start(spec)
+            return controller.start(spec, revision=profile_revision)
+        except KeyError:
+            raise HTTPException(404, "指定した出力先の版が見つかりません") from None
         except RuntimeError as e:
             raise HTTPException(409, str(e)) from None
 
