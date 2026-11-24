@@ -16,6 +16,8 @@ OSの実ログや実際のサーバー負荷を採取するエージェントで
 
 ## 操作ガイド
 
+[ひな型の選び方・詳細設定の画面・自分のひな型の作り方](docs/preset-guide.md)
+
 [![出力先と件数、ログの見本と出力開始を示すログ生成画面。青い枠は詳細設定。](docs/images/operation-guide.png)](docs/images/operation-guide.png)
 
 1. ログのひな型を選び、「ひな型を読み込む」を押します。

@@ -40,13 +40,17 @@
           <h2>ログをつくる</h2>
           <section class="card" aria-labelledby="basicTitle">
             <h3 id="basicTitle">基本設定</h3>
-            <p class="muted">まずは表示中の設定で見本を確認できます。別の例を試すときはひな型を読み込みます。</p>
+            <p class="muted">ひな型は、生成するデータや試したい状況をまとめた設定です。選んだら「ひな型を読み込む」で編集欄に反映します。</p>
             <div class="toolbar">
               <label>ひな型（プリセット）<select id="presetSelect"></select></label>
               <button id="loadPreset" type="button">ひな型を読み込む</button>
             </div>
-            <details class="preset-help">
-              <summary>選んだひな型の説明</summary>
+            <div class="preset-scenario">
+              <strong>どんな状況のひな型か</strong>
+              <p id="presetScenario" aria-live="polite"></p>
+            </div>
+            <details id="presetDetailsPanel" class="preset-help">
+              <summary>生成内容・確認すること・実行前の条件</summary>
               <p id="presetDetails" class="note"></p>
             </details>
             <p id="editingPreset" class="editing-preset"></p>
@@ -125,10 +129,22 @@
         <section id="json" class="tab">
           <h2>プリセットJSON</h2>
           <div class="card">
+            <section id="presetMetadata" aria-label="ひな型を保存">
+              <h3>ひな型を保存</h3>
+              <p class="muted">新しく保存するときは、既存のひな型と異なるIDを使います。</p>
+              <div class="preset-metadata-fields">
+                <div class="control"><label for="presetId">プリセットID</label>
+                  <input id="presetId" maxlength="64" placeholder="my-preset" />
+                </div>
+                <div class="control"><label for="presetDisplayName">ひな型の表示名（任意）</label>
+                  <input id="presetDisplayName" maxlength="120" placeholder="今の名前を使う場合は空欄" />
+                </div>
+              </div>
+              <label for="presetPurpose">想定する状況（任意）</label>
+              <textarea id="presetPurpose" maxlength="1000" rows="2" placeholder="何を試すのか、結果のどこを見るのか"></textarea>
+              <button id="savePreset" class="primary" type="button">ひな型として保存</button>
+            </section>
             <label
-              data-help="保存するID。英数字・ハイフン・下線。同じIDは更新します。"
-              >プリセットID<input id="presetId" value="my-preset" /></label
-            ><label
               >JSONファイルを読み込む<input
                 id="importJson"
                 type="file"
@@ -143,10 +159,8 @@
               ></textarea>
             </label>
             <div class="actionbar">
-              <button id="applyJson">JSONを画面へ反映</button
-              ><button id="savePreset" class="primary">
-                プリセットとして保存</button
-              ><button id="exportJson">JSONを書き出す</button>
+              <button id="applyJson">JSONを画面へ反映</button>
+              <button id="exportJson">JSONを書き出す</button>
             </div>
           </div>
         </section>
