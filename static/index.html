@@ -49,7 +49,7 @@
           <p id="presetDetails" class="note"></p>
           <form id="specForm"><div id="editor"></div></form>
           <div class="actionbar">
-            <button id="preview">プレビュー（書き込みなし）</button
+            <button id="preview">整形後のログを確認</button
             ><button id="start" class="primary">この設定で開始</button
             ><button id="stop" class="danger">停止</button>
           </div>
@@ -57,7 +57,11 @@
             実行中の設定は固定します。変更は停止後、開始すると反映されます。停止しても保存済みデータは残ります。
           </p>
           <div class="card">
-            <h3>プレビュー / 結果</h3>
+            <h3>収集側が受け取るログの見本</h3>
+            <div id="logPreview" aria-live="polite">
+              <p>「整形後のログを確認」を押すと、現在の設定でログ本文とバイト数を確認できます。送信・保存はしません。</p>
+            </div>
+            <h3>元データの見本</h3>
             <div id="previewTable" class="table-scroll"></div>
             <details>
               <summary>JSONの詳細</summary>

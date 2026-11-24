@@ -219,6 +219,21 @@ class HistorianDriver(Base):
                 )
 
 
+class DeliveryLogHandler(logging.handlers.RotatingFileHandler):
+    """ファイル書き込み失敗を、保存済みの未配送キューへ伝える。"""
+
+    def handleError(self, record):
+        """本文を標準エラーへ出さず、元の例外を配送ループへ返す。"""
+        raise
+
+
+def syslog_tcp_frame(data, framing):
+    """文字数でなくUTF-8のバイト数でTCP/TLSのメッセージ境界を組み立てる。"""
+    if framing == "octet_counting":
+        return str(len(data)).encode("ascii") + b" " + data
+    return data + b"\n"
+
+
 class EventDriver(Base):
     """ログ・識別イベントを永続キューに保存して設定先へ配送する。"""
 
@@ -251,7 +266,7 @@ class EventDriver(Base):
                 os.environ.get("LOG_DIR", str(self.c.store.root / "logs"))
             )
             folder.mkdir(parents=True, exist_ok=True)
-            self.handler = logging.handlers.RotatingFileHandler(
+            self.handler = DeliveryLogHandler(
                 folder / "events.log",
                 maxBytes=self.c.spec.logs.rotate_mb * 1024**2,
                 backupCount=self.c.spec.logs.backups,
@@ -263,12 +278,16 @@ class EventDriver(Base):
             "delivery_boundary": "UDP/TCP: socket accepted; TLS/HTTP/MQTT: transport-specific ack; file: local flush; capture: no external send",
         }
 
-    def event(self, sequence):
+    def event(self, sequence, *, trace=None):
         """共通生成行に識別イベントのID・読取機・バーコード等を補う。
 
         明示された既存項目は維持し、異常周期に当たる識別子だけを置き換える。
         """
-        row = self.c.record(sequence)
+        if trace is None:
+            row = self.c.record(sequence)
+        else:
+            g = self.c.spec.generator
+            row = generate_record(g, g.start_sequence + sequence, trace=trace)
         row.setdefault(
             "event_id",
             row.get("id", record_key(self.c.spec.generator, sequence)),
@@ -313,14 +332,14 @@ class EventDriver(Base):
                 row["operator_id"] = "UNREGISTERED-WORKER"
         return row
 
-    def log_message(self, row, sequence):
+    def log_message(self, row, sequence, *, at=None):
         """生成行を指定のJSONL・平文・Syslog書式の一メッセージに整形する。"""
         opts = self.c.spec.logs
         message = render(opts.message_template, {**row, "sequence": sequence})
         if opts.format == "jsonl":
             return json.dumps(
                 {
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": (at or datetime.now(timezone.utc)).isoformat(),
                     "severity": opts.severity,
                     "facility": opts.facility,
                     "host": opts.hostname,
@@ -331,12 +350,12 @@ class EventDriver(Base):
                 ensure_ascii=False,
             )
         if opts.format == "plain":
-            return datetime.now(timezone.utc).isoformat() + " " + message
+            return (at or datetime.now(timezone.utc)).isoformat() + " " + message
         priority = opts.facility * 8 + opts.severity
         if opts.format == "rfc3164":
             return (
                 f"<{priority}>"
-                + datetime.now().strftime("%b %d %H:%M:%S")
+                + (at or datetime.now()).strftime("%b %d %H:%M:%S")
                 + " "
                 + opts.hostname
                 + " "
@@ -346,7 +365,7 @@ class EventDriver(Base):
             )
         return (
             f"<{priority}>1 "
-            + datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            + (at or datetime.now(timezone.utc)).isoformat().replace("+00:00", "Z")
             + " "
             + opts.hostname
             + " "
@@ -354,6 +373,17 @@ class EventDriver(Base):
             + " - EVENT - \ufeff"
             + message
         )
+
+    def log_payload(self, row, sequence, *, at=None):
+        """配送時と同じ破損設定を、本文見本にも反映する。"""
+        payload = self.log_message(row, sequence, at=at)
+        options = self.c.spec.logs
+        malformed = bool(
+            options.malformed_every and (sequence + 1) % options.malformed_every == 0
+        )
+        if malformed:
+            payload = "BROKEN-HEADER " + payload[8:]
+        return payload, malformed
 
     async def step(self, tick):
         """欠落・重複・破損を模擬してイベントと次連番を保存し、配送を試みる。"""
@@ -374,16 +404,10 @@ class EventDriver(Base):
                 continue
             row = self.event(sequence)
             payload = (
-                self.log_message(row, sequence)
+                self.log_payload(row, sequence)[0]
                 if self.c.kind == "logs"
                 else json.dumps(row, ensure_ascii=False, allow_nan=False)
             )
-            if (
-                self.c.kind == "logs"
-                and opts.malformed_every
-                and (sequence + 1) % opts.malformed_every == 0
-            ):
-                payload = "BROKEN-HEADER " + payload[8:]
             entries = [(row["event_id"], payload)]
             if (
                 opts.duplicate_every
@@ -446,11 +470,7 @@ class EventDriver(Base):
                 s.sendto(data, (p.host, p.port or 514))
             return
         if p.output in {"tcp", "tls"}:
-            wire = (
-                (str(len(data)).encode() + b" " + data)
-                if self.c.spec.logs.tcp_framing == "octet_counting"
-                else data + b"\n"
-            )
+            wire = syslog_tcp_frame(data, self.c.spec.logs.tcp_framing)
             with socket.create_connection(
                 (p.host, p.port or (6514 if p.output == "tls" else 514)),
                 timeout=p.timeout_seconds,
