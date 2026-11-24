@@ -390,11 +390,22 @@ function control(
 }
 /* 生成設定の編集領域を現在specから作り直す。DOMのみ置き換え、サーバーへ保存しない。 */
 function render() {
-  const target = $("#editor");
-  target.replaceChildren();
-  const area = el("div", { class: "card grid" });
-  object(area, info.schemas.spec, spec, info.schemas.spec);
-  target.append(area);
+  const root = info.schemas.spec;
+  const { profile_id: profileField, ...options } = root.properties;
+  const basics = $("#basicEditor");
+  const advanced = $("#editor");
+  basics.replaceChildren();
+  advanced.replaceChildren();
+  object(basics, { properties: {
+    profile_id: { ...profileField, title: "ログの出力設定" },
+  } }, spec, root);
+  const { batch_size, ...advancedOptions } = options;
+  object(basics, { properties: {
+    batch_size: { ...batch_size, title: "1回につくるログの件数" },
+  } }, spec, root);
+  object(advanced, { properties: advancedOptions }, spec, root);
+  $("#editingPreset").textContent = "編集中の設定: " + (spec.name || "名称未設定");
+  $("#previewResults").hidden = true;
 }
 /* 現在profileから接続設定フォームを作り直す。保存は別の操作で行う。 */
 function renderProfile() {
@@ -443,7 +454,10 @@ function validated(
 ) {
   for (const input of $(selector).querySelectorAll("input,select,textarea"))
     if (!input.checkValidity()) {
-      input.closest("details")?.setAttribute("open", "");
+      for (let details = input.closest("details"); details;
+        details = details.parentElement.closest("details")) {
+        details.open = true;
+      }
       input.reportValidity();
       throw new Error("入力を確認してください");
     }
@@ -513,8 +527,16 @@ function download(
 /* 実行状態を取得し、件数・状態JSON・公開インターフェース・最近のレコードを更新する。取得失敗は呼出側が扱う。 */
 async function monitor() {
   state = await api("/api/state");
+  const statusLabels = {
+    stopped: "停止中",
+    starting: "起動中",
+    running: "実行中",
+    stopping: "停止処理中",
+    failed: "エラー",
+  };
   $("#status").textContent =
-    state.status + " · " + state.produced.toLocaleString() + "件";
+    (statusLabels[state.status] ?? state.status) + " · " +
+    state.produced.toLocaleString() + "件";
   $("#stateJson").textContent = JSON.stringify(state, null, 2);
   $("#interfaces").textContent = JSON.stringify(
     state.protocols && Object.keys(state.protocols).length
@@ -592,6 +614,11 @@ async function init() {
         (x.onclick = /* 押されたナビゲーションが指すタブへ切り替える。 */ () =>
           tab(x.dataset.tab)),
     );
+  $("#specForm").addEventListener("submit", (event) => event.preventDefault());
+  $("#specForm").addEventListener("input", () => {
+    $("#editingPreset").textContent = "編集中の設定: " + (spec.name || "名称未設定");
+    $("#previewResults").hidden = true;
+  });
   $("#presetSelect").onchange = description;
   action(
     "#loadPreset",
@@ -627,7 +654,10 @@ async function init() {
         ),
       );
       $("#result").textContent = JSON.stringify(v, null, 2);
-      notice("プレビューしました。書き込み・公開・送信はしていません。");
+      const results = $("#previewResults");
+      results.hidden = false;
+      results.focus();
+      notice("見本を表示しました。");
     },
   );
   action(

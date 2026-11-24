@@ -1,3 +1,17 @@
+@font-face {
+  font-family: "Zen Kaku Gothic New";
+  src: url("/static/fonts/zen-kaku-gothic-new-regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Zen Kaku Gothic New";
+  src: url("/static/fonts/zen-kaku-gothic-new-bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600 800;
+  font-display: swap;
+}
 /* 画面共通の色・配置・入力部品を定義する。JSはactive等のクラスを切り替えるだけで、表示の見た目はここが担当する。 */
 :root {
   color-scheme: dark;
@@ -9,7 +23,7 @@
   --muted: #9dafbb;
   --accent: #72dec7;
   --warn: #f7c783;
-  font-family: Inter, "Noto Sans JP", system-ui, sans-serif;
+  font-family: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", "Meiryo", system-ui, sans-serif;
   font-size: 14px;
 }
 * {
@@ -163,7 +177,7 @@ input[type="file"] {
 textarea {
   resize: vertical;
   line-height: 1.6;
-  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Zen Kaku Gothic New", "Yu Gothic", monospace;
 }
 input:focus,
 select:focus,
@@ -534,4 +548,92 @@ footer {
   line-height: 1.9;
   background: var(--panel);
   border-radius: 6px;
+}
+
+#basicEditor {
+  margin-block: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+}
+#advancedSettings {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+#advancedSettings #toJson {
+  margin-top: 14px;
+}
+.preset-help {
+  margin-top: 8px;
+}
+#previewResults:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+@media (max-width: 520px) {
+  nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .nav {
+    min-width: 0;
+    white-space: normal;
+  }
+}
+
+header {
+  gap: 16px;
+}
+header > div {
+  min-width: 0;
+}
+header > .badge {
+  flex-shrink: 0;
+}
+.nav {
+  min-height: 44px;
+  font-size: 13px;
+  align-items: center;
+}
+#generate button,
+#generate summary {
+  min-height: 40px;
+}
+#generate summary {
+  padding-block: 8px;
+  line-height: 1.6;
+}
+#generate summary:focus-visible,
+#generate .table-scroll:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.preview-step {
+  border-color: #49766e;
+  background: linear-gradient(120deg, #1a2e33, var(--panel) 60%);
+}
+.preview-step h3 {
+  margin-bottom: 6px;
+}
+.preview-step .muted {
+  margin-top: 0;
+}
+.run-step .actionbar {
+  margin: 12px 0;
+}
+@media (max-width: 520px) {
+  header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  #generate .toolbar > label {
+    flex-basis: 100%;
+  }
+}
+
+.editing-preset {
+  margin: 14px 0 0;
+  padding: 8px 10px;
+  background: var(--panel2);
+  border-radius: 6px;
+  overflow-wrap: anywhere;
 }
