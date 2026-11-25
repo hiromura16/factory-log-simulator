@@ -403,6 +403,23 @@ function render() {
   object(basics, { properties: {
     batch_size: { ...batch_size, title: "1回につくるログの件数" },
   } }, spec, root);
+  const logs = ref(advancedOptions.logs, root);
+  const labels = {
+    format: "ログ書式",
+    facility: "発生元の分類（Facility）",
+    severity: "重要度（Severity）",
+    hostname: "ログ内のホスト名",
+    app_name: "ログ内のアプリ名",
+    message_template: "ログ本文のひな型",
+    rotate_mb: "ファイルを切り替えるサイズ（MiB）",
+    backups: "残す過去ファイルの数",
+    duplicate_every: "重複を発生させる間隔",
+    malformed_every: "壊れたヘッダーを発生させる間隔",
+  };
+  const logOptions = Object.fromEntries(Object.entries(logs.properties).map(
+    ([key, option]) => [key, labels[key] ? { ...option, title: labels[key] } : option],
+  ));
+  advancedOptions.logs = { ...logs, title: "ログ設定", properties: logOptions };
   object(advanced, { properties: advancedOptions }, spec, root);
   $("#editingPreset").textContent = "編集中の設定: " + (spec.name || "名称未設定");
   $("#previewResults").hidden = true;
@@ -446,19 +463,26 @@ function description() {
     /* 現在選択中のプリセットIDと一致する要素を探す。 */ (p) =>
       p.id === $("#presetSelect").value,
   );
-  $("#presetDetails").textContent = p?.spec.description || "";
+  const parts = (p?.spec.description || "").trim().split(/\r?\n\s*\r?\n/);
+  const scenario = parts.shift()?.replace(/^【想定(?:する状況)?】\s*/, "").trim();
+  $("#presetScenario").textContent = scenario || "このひな型には状況の説明がありません。";
+  $("#presetDetails").textContent = parts.join("\n\n");
+  $("#presetDetailsPanel").hidden = parts.length === 0;
 }
 /* フォーム内の制約違反を探す。該当箇所のdetailsを開いてブラウザーの検証表示を出し、例外で後続操作を止める。 */
 function validated(
   selector,
+  showError = true,
 ) {
   for (const input of $(selector).querySelectorAll("input,select,textarea"))
     if (!input.checkValidity()) {
-      for (let details = input.closest("details"); details;
-        details = details.parentElement.closest("details")) {
-        details.open = true;
+      if (showError) {
+        for (let details = input.closest("details"); details;
+          details = details.parentElement.closest("details")) {
+          details.open = true;
+        }
+        input.reportValidity();
       }
-      input.reportValidity();
       throw new Error("入力を確認してください");
     }
 }
@@ -607,6 +631,24 @@ async function init() {
   render();
   profile = cleanProfile(profiles[0]);
   renderProfile();
+  window.FactoryComparison.mount({
+    app: "log-simulator",
+    listPresets: () => presets,
+    currentSpec: () => {
+      validated("#specForm", false);
+      return copy(spec);
+    },
+    preview: (candidate) => api("/api/preview", candidate),
+    metrics: (spec, data) => ({
+      "ログ書式": spec.logs.format,
+      "見本の最小サイズ（B）": data.log_preview?.samples.length ? Math.min(...data.log_preview.samples.map((row) => row.message_bytes)) : null,
+      "見本の最大サイズ（B）": data.log_preview?.samples.length ? Math.max(...data.log_preview.samples.map((row) => row.message_bytes)) : null,
+      "重複する見本の数": data.log_preview?.samples.filter((row) => row.duplicate).length ?? null,
+      "書式不正の見本の数": data.log_preview?.samples.filter((row) => row.malformed).length ?? null,
+      "切り替えサイズ（MiB）": spec.logs.rotate_mb,
+      "保管するローテーション数": spec.logs.backups,
+    }),
+  });
   document
     .querySelectorAll("[data-tab]")
     .forEach(
@@ -684,12 +726,16 @@ async function init() {
     /* フォーム検証後のspecを整形JSON欄へ転記してJSONタブを開く。 */ () => {
       validated("#specForm");
       $("#jsonText").value = JSON.stringify(spec, null, 2);
+      $("#presetId").value = "";
+      $("#presetDisplayName").value = "";
+      $("#presetPurpose").value = "";
       tab("json");
+      $("#presetId").focus();
     },
   );
   /* JSON欄を解析してプレビューAPIで検証し、正規化された設定を返す。JSON構文・API検証エラーは呼出側へ伝える。 */
-  async function fromJson() {
-    return (await api("/api/preview", JSON.parse($("#jsonText").value))).validated_spec;
+  async function fromJson(draft = JSON.parse($("#jsonText").value)) {
+    return (await api("/api/preview", draft)).validated_spec;
   }
   action(
     "#applyJson",
@@ -706,9 +752,17 @@ async function init() {
       const id = $("#presetId").value;
       if (!/^[A-Za-z0-9_-]{1,64}$/.test(id))
         throw new Error("プリセットIDを確認してください");
-      spec = await fromJson();
+      const draft = JSON.parse($("#jsonText").value);
+      const displayName = $("#presetDisplayName").value.trim();
+      const purpose = $("#presetPurpose").value.trim();
+      if (displayName) draft.name = displayName;
+      if (purpose) draft.description = purpose;
+      spec = await fromJson(draft);
       await api("/api/presets/" + id, spec);
+      $("#jsonText").value = JSON.stringify(spec, null, 2);
       await refresh();
+      $("#presetSelect").value = id;
+      description();
       render();
       notice("プリセットを保存しました。");
     },
