@@ -472,14 +472,17 @@ function description() {
 /* フォーム内の制約違反を探す。該当箇所のdetailsを開いてブラウザーの検証表示を出し、例外で後続操作を止める。 */
 function validated(
   selector,
+  showError = true,
 ) {
   for (const input of $(selector).querySelectorAll("input,select,textarea"))
     if (!input.checkValidity()) {
-      for (let details = input.closest("details"); details;
-        details = details.parentElement.closest("details")) {
-        details.open = true;
+      if (showError) {
+        for (let details = input.closest("details"); details;
+          details = details.parentElement.closest("details")) {
+          details.open = true;
+        }
+        input.reportValidity();
       }
-      input.reportValidity();
       throw new Error("入力を確認してください");
     }
 }
@@ -628,6 +631,24 @@ async function init() {
   render();
   profile = cleanProfile(profiles[0]);
   renderProfile();
+  window.FactoryComparison.mount({
+    app: "log-simulator",
+    listPresets: () => presets,
+    currentSpec: () => {
+      validated("#specForm", false);
+      return copy(spec);
+    },
+    preview: (candidate) => api("/api/preview", candidate),
+    metrics: (spec, data) => ({
+      "ログ書式": spec.logs.format,
+      "見本の最小サイズ（B）": data.log_preview?.samples.length ? Math.min(...data.log_preview.samples.map((row) => row.message_bytes)) : null,
+      "見本の最大サイズ（B）": data.log_preview?.samples.length ? Math.max(...data.log_preview.samples.map((row) => row.message_bytes)) : null,
+      "重複する見本の数": data.log_preview?.samples.filter((row) => row.duplicate).length ?? null,
+      "書式不正の見本の数": data.log_preview?.samples.filter((row) => row.malformed).length ?? null,
+      "切り替えサイズ（MiB）": spec.logs.rotate_mb,
+      "保管するローテーション数": spec.logs.backups,
+    }),
+  });
   document
     .querySelectorAll("[data-tab]")
     .forEach(
