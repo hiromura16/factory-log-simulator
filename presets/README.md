@@ -3,32 +3,32 @@
 迷ったときは[ひな型を選ぶ・作る](../docs/preset-guide.md)を参照してください。
 アプリで保存したひな型はアプリの一覧から開きます。
 
-| ID | 表示名 | 最大tick数 | 想定 |
+| ID | 表示名 | 最大tick数 | 生成する内容 |
 | --- | --- | --- | --- |
-| [01-normal](#01-normal) | 正常 / ローカル回転ログ / RFC5424 | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。ローカル回転ログ / RFC5424を想定 |
-| [02-normal](#02-normal) | 正常 / JSON Lines | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。JSON Linesを想定 |
-| [03-normal](#03-normal) | 正常 / プレーンログ | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。プレーンログを想定 |
-| [04-normal](#04-normal) | 正常 / RFC3164 | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。RFC3164を想定 |
-| [05-normal](#05-normal) | 正常 / errorレベル | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。errorレベルを想定 |
-| [06-normal](#06-normal) | 正常 / warningレベル | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。warningレベルを想定 |
-| [07-normal](#07-normal) | 正常 / facility local1 | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。facility local1を想定 |
-| [08-normal](#08-normal) | 正常 / 毎秒100件 | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。毎秒100件を想定 |
-| [09-normal](#09-normal) | 正常 / 低頻度ログ | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。低頻度ログを想定 |
-| [10-normal](#10-normal) | 正常 / 小容量ローテーション | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。小容量ローテーションを想定 |
-| [11-normal](#11-normal) | 正常 / 独自メッセージ | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。独自メッセージを想定 |
-| [12-normal](#12-normal) | 正常 / 日本語ログ | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。日本語ログを想定 |
-| [13-anomaly](#13-anomaly) | 異常 / エラー集中 | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。エラー集中を想定 |
-| [14-anomaly](#14-anomaly) | 異常 / 重複ログ | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。重複ログを想定 |
-| [15-anomaly](#15-anomaly) | 異常 / 壊れたヘッダー | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。壊れたヘッダーを想定 |
-| [16-anomaly](#16-anomaly) | 異常 / 文字列へ異常値 | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。文字列へ異常値を想定 |
-| [17-anomaly](#17-anomaly) | 異常 / 遅い出力 | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。遅い出力を想定 |
-| [18-anomaly](#18-anomaly) | 異常 / warningの集中 | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。warningの集中を想定 |
-| [19-anomaly](#19-anomaly) | 異常 / 固着した値 | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。固着した値を想定 |
-| [20-anomaly](#20-anomaly) | 異常 / 日本語と改行 | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。日本語と改行を想定 |
-| [21-anomaly](#21-anomaly) | 異常 / 大きなメッセージ | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。大きなメッセージを想定 |
-| [22-anomaly](#22-anomaly) | 異常 / 欠測値 | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。欠測値を想定 |
-| [23-anomaly](#23-anomaly) | 異常 / 未知の状態 | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。未知の状態を想定 |
-| [24-anomaly](#24-anomaly) | 異常 / 送信エラーを保持 | 手動停止まで | ログ収集・パース・ローテーション・配送失敗の扱いの検証。送信エラーを保持を想定 |
+| [01-normal](#01-normal) | 正常 / ローカル回転ログ / RFC5424 | 手動停止まで | ローカル回転ログ / RFC5424を想定 |
+| [02-normal](#02-normal) | 正常 / JSON Lines | 手動停止まで | 1tickに5件、書式jsonl、facility=16、severity=6。回転上限10MiB、バックアップ5本 |
+| [03-normal](#03-normal) | 正常 / プレーンログ | 手動停止まで | 1tickに5件、書式plain、facility=16、severity=6。回転上限10MiB、バックアップ5本 |
+| [04-normal](#04-normal) | 正常 / RFC3164 | 手動停止まで | 1tickに5件、書式rfc3164、facility=16、severity=6。回転上限10MiB、バックアップ5本 |
+| [05-normal](#05-normal) | 正常 / errorレベル | 手動停止まで | 1tickに5件、書式rfc5424、facility=16、severity=3。回転上限10MiB、バックアップ5本 |
+| [06-normal](#06-normal) | 正常 / warningレベル | 手動停止まで | 1tickに5件、書式rfc5424、facility=16、severity=4。回転上限10MiB、バックアップ5本 |
+| [07-normal](#07-normal) | 正常 / facility local1 | 手動停止まで | 1tickに5件、書式rfc5424、facility=17、severity=6。回転上限10MiB、バックアップ5本 |
+| [08-normal](#08-normal) | 正常 / 毎秒100件 | 手動停止まで | 1tickに100件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本 |
+| [09-normal](#09-normal) | 正常 / 低頻度ログ | 手動停止まで | 低頻度ログを想定 |
+| [10-normal](#10-normal) | 正常 / 小容量ローテーション | 手動停止まで | 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限1MiB、バックアップ3本 |
+| [11-normal](#11-normal) | 正常 / 独自メッセージ | 手動停止まで | 本文テンプレート: source={entity_id} sequence={sequence_no} measurement={value} |
+| [12-normal](#12-normal) | 正常 / 日本語ログ | 手動停止まで | 日本語ログを想定 |
+| [13-anomaly](#13-anomaly) | 異常 / エラー集中 | 手動停止まで | 1tickに100件、書式rfc5424、facility=16、severity=3。回転上限10MiB、バックアップ5本 |
+| [14-anomaly](#14-anomaly) | 異常 / 重複ログ | 手動停止まで | 3件ごとに同じevent_idと本文を重複出力 |
+| [15-anomaly](#15-anomaly) | 異常 / 壊れたヘッダー | 手動停止まで | 3件ごとにヘッダーを意図的に破損 |
+| [16-anomaly](#16-anomaly) | 異常 / 文字列へ異常値 | 手動停止まで | 項目valueへset、値='ERROR'を生成位置0〜以降で適用。異常後の型検証を迂回=True |
+| [17-anomaly](#17-anomaly) | 異常 / 遅い出力 | 手動停止まで | 遅い出力を想定 |
+| [18-anomaly](#18-anomaly) | 異常 / warningの集中 | 手動停止まで | 1tickに100件、書式rfc5424、facility=16、severity=4。回転上限10MiB、バックアップ5本 |
+| [19-anomaly](#19-anomaly) | 異常 / 固着した値 | 手動停止まで | 項目valueへfreeze、値=Noneを生成位置0〜以降で適用。異常後の型検証を迂回=False |
+| [20-anomaly](#20-anomaly) | 異常 / 日本語と改行 | 手動停止まで | 日本語と改行を想定 |
+| [21-anomaly](#21-anomaly) | 異常 / 大きなメッセージ | 手動停止まで | 本文テンプレート: large-message large-message large-message large-message large-message large-message large-message large-messag… |
+| [22-anomaly](#22-anomaly) | 異常 / 欠測値 | 手動停止まで | 項目valueへnull、値=Noneを生成位置0〜以降で適用。異常後の型検証を迂回=False |
+| [23-anomaly](#23-anomaly) | 異常 / 未知の状態 | 手動停止まで | 項目statusへset、値='UNKNOWN'を生成位置0〜以降で適用。異常後の型検証を迂回=False |
+| [24-anomaly](#24-anomaly) | 異常 / 送信エラーを保持 | 手動停止まで | 送信エラーを保持を想定 |
 
 ## ひな型ごとの内容
 
@@ -172,7 +172,7 @@
 **異常 / 文字列へ異常値** · [JSONをダウンロード](16-anomaly.json)
 
 - **想定**　ログ収集・パース・ローテーション・配送失敗の扱いの検証。文字列へ異常値を想定。
-- **生成内容・条件**　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。 項目valueへset、値='ERROR'を生成位置0〜以降で適用。異常後の型検証を迂回=はい。
+- **生成内容・条件**　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。 項目valueへset、値='ERROR'を生成位置0〜以降で適用。異常後の型検証を迂回=True。
 - **確認事項**　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。
 - **実行前**　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。
 
@@ -199,7 +199,7 @@
 **異常 / 固着した値** · [JSONをダウンロード](19-anomaly.json)
 
 - **想定**　ログ収集・パース・ローテーション・配送失敗の扱いの検証。固着した値を想定。
-- **生成内容・条件**　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。 項目valueへfreeze、値=Noneを生成位置0〜以降で適用。異常後の型検証を迂回=いいえ。
+- **生成内容・条件**　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。 項目valueへfreeze、値=Noneを生成位置0〜以降で適用。異常後の型検証を迂回=False。
 - **確認事項**　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。
 - **実行前**　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。
 
@@ -226,7 +226,7 @@
 **異常 / 欠測値** · [JSONをダウンロード](22-anomaly.json)
 
 - **想定**　ログ収集・パース・ローテーション・配送失敗の扱いの検証。欠測値を想定。
-- **生成内容・条件**　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。 項目valueへnull、値=Noneを生成位置0〜以降で適用。異常後の型検証を迂回=いいえ。
+- **生成内容・条件**　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。 項目valueへnull、値=Noneを生成位置0〜以降で適用。異常後の型検証を迂回=False。
 - **確認事項**　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。
 - **実行前**　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。
 
@@ -235,7 +235,7 @@
 **異常 / 未知の状態** · [JSONをダウンロード](23-anomaly.json)
 
 - **想定**　ログ収集・パース・ローテーション・配送失敗の扱いの検証。未知の状態を想定。
-- **生成内容・条件**　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。 項目statusへset、値='UNKNOWN'を生成位置0〜以降で適用。異常後の型検証を迂回=いいえ。
+- **生成内容・条件**　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。 項目statusへset、値='UNKNOWN'を生成位置0〜以降で適用。異常後の型検証を迂回=False。
 - **確認事項**　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。
 - **実行前**　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。
 

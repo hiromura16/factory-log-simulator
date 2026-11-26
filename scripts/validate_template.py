@@ -10,13 +10,10 @@ from pydantic import ValidationError
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from config import ConfigurationError, RunSpec  # noqa: E402
-from generation import (  # noqa: E402
-    GenerationError,
-    generation_context,
-    sample_offsets,
-    validate_generation,
-)
+from config import ConfigurationError  # noqa: E402
+from generation import GenerationError  # noqa: E402
+from models import Spec  # noqa: E402
+from validation import validate_source_spec  # noqa: E402
 
 KIND = "logs"
 MAX_BYTES = 2 * 1024 * 1024
@@ -24,58 +21,7 @@ MAX_BYTES = 2 * 1024 * 1024
 
 def validate_template(payload):
     """このアプリで使う設定と、代表行の生成を検証する。"""
-    if KIND in {"files", "sql", "stream"}:
-        spec = RunSpec.model_validate(payload)
-        if KIND != "stream" and spec.task != "generate":
-            raise GenerationError("再送はストリーム送信で使えます", path=("task",))
-        if KIND != "files" and spec.faults.enabled and spec.faults.artifact_mode != "none":
-            raise GenerationError(
-                "不正ファイルの生成設定はファイル生成で使えます",
-                path=("faults", "artifact_mode"),
-            )
-        validate_generation(spec, kind=KIND)
-        if KIND == "stream":
-            validate_stream_templates(spec)
-        return spec
-
-    from models import Spec
-
-    spec = Spec.model_validate(payload)
-    if KIND in {"api", "equipment", "historian"}:
-        from validation import validate_source_spec
-
-        validate_source_spec(KIND, spec)
-    else:
-        try:
-            validate_generation(spec.generator, kind="source")
-        except GenerationError as exc:
-            raise GenerationError(str(exc), path=("generator", *exc.path)) from None
-    if KIND == "logs":
-        validate_log_template(spec)
-    return spec
-
-
-def validate_log_template(spec):
-    """ドライバーの整形処理でログ本文の参照を確認する。配送は開始しない。"""
-    from types import SimpleNamespace
-
-    from drivers import EventDriver
-
-    driver = EventDriver(SimpleNamespace(kind=KIND, spec=spec))
-    with generation_context("logs", "message_template"):
-        for offset in sample_offsets(spec.generator):
-            driver.log_payload(driver.event(offset, trace=[]), offset)
-
-
-def validate_stream_templates(spec):
-    """接続情報を読み込まず、イベントの本文とトピックを組み立てる。"""
-    from generation import generate_record
-    from stream_events import build_events
-
-    with generation_context("stream", "topic_template"):
-        for offset in sample_offsets(spec):
-            sequence = spec.start_sequence + offset
-            build_events(spec, generate_record(spec, sequence), sequence, None)
+    return validate_source_spec(KIND, Spec.model_validate(payload))
 
 
 def location(parts):

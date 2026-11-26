@@ -40,7 +40,7 @@ async function api(
   path,
   body,
 ) {
-  const r = await fetch(
+  const r = await fetchWithOperationConfirmation(
     path,
     body === undefined
       ? {}
@@ -50,7 +50,9 @@ async function api(
           body: JSON.stringify(body),
         },
   );
-  return readApiJson(r);
+  const data = await readApiJson(r);
+  showPreviewWarnings(path, data);
+  return data;
 }
 /* 送信しない見本として本文・フレーミング・異常をテキスト表示する。 */
 function renderLogPreview(plan) {
@@ -71,12 +73,10 @@ function renderLogPreview(plan) {
   }
 }
 
-/* 外部送信とファイル保存は確認し、確認した出力先の版だけで実行する。 */
-function confirmedStartPath() {
+/* 画面で選択した出力先の版で、サーバーに開始を要求する。 */
+function selectedStartPath() {
   const destination = profiles.find((item) => item.id === spec.profile_id);
   if (!destination?.revision) throw new Error("登録済み出力先を確認してください。");
-  if (destination.output !== "capture" &&
-      !window.confirm("「" + destination.name + "」(" + destination.id + "・版 " + destination.revision + ") へログを出力します。続行しますか？")) return null;
   return "/api/start?profile_revision=" + destination.revision;
 }
 
@@ -701,9 +701,7 @@ async function init() {
     "#start",
     /* フォーム検証後に開始要求を送信し、状態を再取得して通知する。失敗は共通action処理が表示する。 */ async () => {
       validated("#specForm");
-      const path = confirmedStartPath();
-      if (!path) return;
-      await api(path, spec);
+      await api(selectedStartPath(), spec);
       await monitor();
       notice("開始しました。");
     },

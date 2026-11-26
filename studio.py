@@ -23,13 +23,16 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from models import Profile, Spec, TITLES, SECRETS
 from config import ConfigurationError
-from generation import generate_record, sample_offsets, validate_generation
+from generation import anomaly_warnings
+from generation import generate_record, sample_offsets
 from store import Store
+from operation_confirmation import CONFIRMATION_HEADER, install_operation_gate
 from api_support import (
     install_error_handlers, install_help,
     management_credentials, unauthorized_management,
 )
 from controller import Controller
+from validation import validate_source_spec
 
 
 # 接続ファイル取込の名前とBase64本文を制限する入力契約。
@@ -342,6 +345,10 @@ def create_app(kind):
 
     app.mount("/static", StaticFiles(directory=root / "static"), name="static")
     install_help(app, root, True, kind, credentials)
+    gate = install_operation_gate(
+        app, kind, store, Spec,
+        validate=lambda spec, _revision: validate_source_spec(kind, spec),
+    )
 
     # 静的な管理画面の入口を返す。
     @app.get("/", include_in_schema=False)
@@ -478,7 +485,7 @@ def create_app(kind):
         """IDは英数字・下線・ハイフンで64文字以内です。JSONを検証し、同じIDならひな型を更新します。"""
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", identity):
             raise HTTPException(422, "プリセットIDを確認してください")
-        validate_generation(spec.generator)
+        validate_source_spec(kind, spec)
         return store.save_preset(identity, spec)
 
     # 境界サンプルを生成し、実行を始めずにデータと異常の影響を確認する。
@@ -489,7 +496,7 @@ def create_app(kind):
     )
     def preview(spec: Spec):
         """入力を検証し、先頭や異常条件の境界で合成した値を records に返します。writes は false です。実行先へ出力しません。"""
-        validate_generation(spec.generator)
+        validate_source_spec(kind, spec)
         offsets = sorted({0, 1, 2, *sample_offsets(spec.generator)})[:12]
         records, hits = [], []
         log_preview = None
@@ -546,6 +553,7 @@ def create_app(kind):
         result = {
             "records": records,
             "anomaly_hits": hits,
+            "warnings": anomaly_warnings(spec.generator, prefix=("generator",)),
             "sequences": offsets,
             "writes": False,
             "validated_spec": spec.model_dump(mode="json"),
@@ -562,10 +570,13 @@ def create_app(kind):
         tags=['実行・出力'],
         responses={409: {'description': 'すでに実行中です'}},
     )
-    def start(spec: Spec, profile_revision: int | None = Query(default=None, ge=1)):
+    def start(request: Request, spec: Spec, profile_revision: int | None = Query(default=None, ge=1)):
         """設定を確定しバックグラウンドに開始を依頼します。現在の状態は GET /api/state で確認します。"""
         try:
-            return controller.start(spec, revision=profile_revision)
+            validate_source_spec(kind, spec)
+            operation = gate.assess("/api/start", spec, profile_revision)
+            gate.require(operation, request.headers.get(CONFIRMATION_HEADER))
+            return controller.start(spec, revision=operation.revision)
         except KeyError:
             raise HTTPException(404, "指定した出力先の版が見つかりません") from None
         except RuntimeError as e:

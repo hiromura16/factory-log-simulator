@@ -80,8 +80,8 @@ def test_log_file_write_failure_stays_pending_until_success(tmp_path, monkeypatc
     assert len((tmp_path / "logs" / "events.log").read_text().splitlines()) == 1
 
 
-def test_log_start_accepts_selected_revision_without_changing_client_contract(monkeypatch):
-    """画面の指定リビジョンを転送し、無指定のクライアントは最新版を使う。"""
+def test_log_start_uses_the_confirmed_revision(monkeypatch, confirmed_start):
+    """確認した版、または版を省略した時点の最新版を開始に使う。"""
     app = create_app("logs")
     calls = []
 
@@ -91,7 +91,11 @@ def test_log_start_accepts_selected_revision_without_changing_client_contract(mo
 
     monkeypatch.setattr(app.state.controller, "start", no_launch)
     with TestClient(app) as client:
-        for query in ("", "?profile_revision=2"):
-            assert client.post(f"/api/start{query}", json={}).status_code == 200
+        for host in ("older.example.invalid", "newer.example.invalid"):
+            response = client.post("/api/profiles", json={"output": "tcp", "host": host})
+            assert response.status_code == 200, response.text
+        assert confirmed_start(client, {}).status_code == 200
+        assert confirmed_start(client, {}, profile_revision=2).status_code == 200
         assert client.post("/api/start?profile_revision=0", json={}).status_code == 422
-    assert calls == [("default", None), ("default", 2)]
+        assert client.post("/api/start?profile_revision=99", json={}).status_code == 404
+    assert calls == [("default", 3), ("default", 2)]

@@ -7,7 +7,9 @@ from studio import create_app
 
 
 @pytest.mark.parametrize("previously_running", [False, True])
-def test_startup_waits_for_explicit_start(monkeypatch, tmp_path, previously_running):
+def test_startup_waits_for_explicit_start(
+    monkeypatch, tmp_path, previously_running, confirmed_start
+):
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     # 旧環境の変数と実行記録が残ったままでも、起動段階では出力しない。
     monkeypatch.setenv("AUTO_START", "1")
@@ -30,7 +32,7 @@ def test_startup_waits_for_explicit_start(monkeypatch, tmp_path, previously_runn
         assert starts == []
         if previously_running:
             assert app.state.store.meta("desired")["spec"] == spec
-        assert client.post("/api/start", json=spec).status_code == 200
+        assert confirmed_start(client, spec).status_code == 200
         assert starts == [spec]
 
 

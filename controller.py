@@ -11,7 +11,8 @@ import time
 from pathlib import Path
 from models import Spec
 from api_support import display_location, history_error
-from generation import GenerationError, generate_record, validate_generation
+from generation import GenerationError, generate_record
+from validation import validate_source_spec
 
 
 class Controller:
@@ -64,14 +65,7 @@ class Controller:
         with self.lock:
             if self.thread and self.thread.is_alive():
                 raise RuntimeError("実行中です。設定変更前に停止してください")
-            validate_generation(spec.generator)
-            if (
-                self.kind == "equipment"
-                and spec.equipment.devices * len(spec.generator.fields) > 5000
-            ):
-                raise ValueError(
-                    "1実行の設備ノードは5000項目以下にしてください"
-                )
+            validate_source_spec(self.kind, spec)
             profile, revision = self.store.profile(spec.profile_id, revision)
             if profile.auth_mode == "basic" and not profile.password:
                 raise ValueError("取得APIのBasic認証パスワードが必要です")
