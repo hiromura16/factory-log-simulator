@@ -1,8 +1,8 @@
 # Python対象バージョン・依存関係・テスト探索条件。インストール時はuv.lockと合わせて使う。
 [project]
 name = "factory-log-simulator"
-version = "0.1.0"
-requires-python = ">=3.12,<3.14"
+version = "0.3.0"
+requires-python = ">=3.12,<3.15"
 dependencies = ["fastapi==0.121.2","uvicorn==0.38.0","cryptography>=46,<50","pillow>=12,<14"]
 [dependency-groups]
 dev = ["httpx==0.28.1","pytest==8.4.2"]

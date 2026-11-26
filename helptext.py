@@ -1,4 +1,4 @@
-"""画面とJSON契約が共有する日本語の項目説明を保持する。"""
+"""入力スキーマに、画面と設定リファレンスで使う項目名と説明を追加する。"""
 
 from config import ConnectionProfile, RunSpec
 
@@ -799,6 +799,7 @@ HELP["kind"] = (
 
 
 def annotated_schemas(kind=None):
+    """入力スキーマに日本語の説明を加え、接続種別を現在のアプリに絞る。"""
     """共通契約に項目説明を付け、指定種類で利用できる接続先に絞る。"""
     from config import ALLOWED_KINDS
 
@@ -813,6 +814,8 @@ def annotated_schemas(kind=None):
         説明表にない項目はKeyErrorとなるため、契約へ項目を追加したら説明も追加する。
         """
         for name, prop in schema.get("properties", {}).items():
+            if prop.get("x-editor-only"):
+                continue
             title, description = HELP[name]
             prop.update(title=title, description=description)
         for child in schema.get("$defs", {}).values():
@@ -831,7 +834,7 @@ def annotated_schemas(kind=None):
     )
     definitions["AnomalyRule"]["properties"]["operation"].update(
         title="異常の作り方",
-        description="set=値を置換、add=加算、multiply=倍率、ramp=開始位置から増加するドリフト、freeze=開始位置の値に固着、null=NULL、copy_from=指定位置の値をコピー、timestamp_shift=秒単位の時刻ずらし、omit=項目自体を欠落。",
+        description="set=値を置換、add=加算、multiply=倍率、ramp=開始位置から増加するドリフト、freeze=開始位置の値に固着、null=NULL、copy_from=指定位置の値をコピー、timestamp_shift=秒単位の時刻ずらし、omit=項目自体を欠落。加算・倍率・ドリフトは元の値が欠測・非数値の行では適用しません。",
     )
     definitions["AnomalyRule"]["properties"]["value"].update(
         title="置換値 / 増分 / 倍率 / 秒数 JSON",
@@ -845,6 +848,13 @@ def annotated_schemas(kind=None):
         title="異常が発生する確率",
         description="適用位置・条件を満たした行に対する0〜1の確率。同じrun_keyとseedなら再現可能です。",
     )
+    comparison = (
+        "eq/neは一致・不一致、gt/ge/lt/leは大小比較、inは配列に含まれるかを判定します。"
+        "大小比較では欠測値や比較できない型は不一致になります。"
+        "inの比較値はJSON配列、または配列を参照する共有パラメーターを指定します。"
+    )
+    for key in ("Condition", "Predicate"):
+        definitions[key]["properties"]["operator"]["description"] = comparison
     if kind:
         result["connection"]["properties"]["kind"]["enum"] = sorted(
             ALLOWED_KINDS[kind]

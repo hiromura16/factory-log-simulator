@@ -2,7 +2,7 @@
 // 編集状態はブラウザー内、実行状態と永続化はサーバー側が管理する。
 "use strict";
 const $ =
-    /* CSSセレクターから最初の要素を取得する。該当なしはnullで、呼出側は画面に必須要素があることを前提とする。 */ (
+    (
       s,
     ) => document.querySelector(s),
   copy =
@@ -40,7 +40,7 @@ async function api(
   path,
   body,
 ) {
-  const r = await fetch(
+  const r = await fetchWithOperationConfirmation(
     path,
     body === undefined
       ? {}
@@ -50,12 +50,9 @@ async function api(
           body: JSON.stringify(body),
         },
   );
-  const v = await r.json();
-  if (!r.ok)
-    throw new Error(
-      typeof v.detail === "string" ? v.detail : JSON.stringify(v.detail || v),
-    );
-  return v;
+  const data = await readApiJson(r);
+  showPreviewWarnings(path, data);
+  return data;
 }
 /* 送信しない見本として本文・フレーミング・異常をテキスト表示する。 */
 function renderLogPreview(plan) {
@@ -66,7 +63,7 @@ function renderLogPreview(plan) {
   target.append(el("p", {},
     plan.format + " / " + (labels[plan.output] || plan.output || "出力先未登録") +
     (plan.tcp_framing ? " / " + plan.tcp_framing : "") +
-    "。時刻は見本です。送信・保存はしていません。"));
+    "。既定の見本時刻は書式を比べるための固定値です。送信・保存はしていません。"));
   for (const sample of plan.samples) {
     target.append(el("p", { class: "muted" },
       "連番 " + sample.sequence + " / UTF-8 " + sample.message_bytes + " バイト" +
@@ -76,12 +73,10 @@ function renderLogPreview(plan) {
   }
 }
 
-/* 外部送信とファイル保存は確認し、確認した出力先の版だけで実行する。 */
-function confirmedStartPath() {
+/* 画面で選択した出力先の版で、サーバーに開始を要求する。 */
+function selectedStartPath() {
   const destination = profiles.find((item) => item.id === spec.profile_id);
   if (!destination?.revision) throw new Error("登録済み出力先を確認してください。");
-  if (destination.output !== "capture" &&
-      !window.confirm("「" + destination.name + "」(" + destination.id + "・版 " + destination.revision + ") へログを出力します。続行しますか？")) return null;
   return "/api/start?profile_revision=" + destination.revision;
 }
 
@@ -91,7 +86,7 @@ function action(
   fn,
 ) {
   $(id).onclick =
-    /* クリックの既定動作を抑えてボタンを一時無効化し、渡された処理を待つ。例外は画面表示し、成否に関係なくfinallyで再有効化する。 */ async (
+    async (
       e,
     ) => {
       e.preventDefault();
@@ -706,9 +701,7 @@ async function init() {
     "#start",
     /* フォーム検証後に開始要求を送信し、状態を再取得して通知する。失敗は共通action処理が表示する。 */ async () => {
       validated("#specForm");
-      const path = confirmedStartPath();
-      if (!path) return;
-      await api(path, spec);
+      await api(selectedStartPath(), spec);
       await monitor();
       notice("開始しました。");
     },
@@ -734,8 +727,9 @@ async function init() {
     },
   );
   /* JSON欄を解析してプレビューAPIで検証し、正規化された設定を返す。JSON構文・API検証エラーは呼出側へ伝える。 */
-  async function fromJson(draft = JSON.parse($("#jsonText").value)) {
-    return (await api("/api/preview", draft)).validated_spec;
+  async function fromJson(draft = readPresetJson($("#jsonText").value), compact = false) {
+    const preview = await api("/api/preview", draft);
+    return compact ? preview.compact_spec : preview.validated_spec;
   }
   action(
     "#applyJson",
@@ -752,7 +746,7 @@ async function init() {
       const id = $("#presetId").value;
       if (!/^[A-Za-z0-9_-]{1,64}$/.test(id))
         throw new Error("プリセットIDを確認してください");
-      const draft = JSON.parse($("#jsonText").value);
+      const draft = readPresetJson($("#jsonText").value);
       const displayName = $("#presetDisplayName").value.trim();
       const purpose = $("#presetPurpose").value.trim();
       if (displayName) draft.name = displayName;
@@ -770,7 +764,7 @@ async function init() {
   action(
     "#exportJson",
     /* JSON欄の検証済み設定を指定IDのファイル名でダウンロードする。 */ async () =>
-      download(await fromJson(), $("#presetId").value + ".json"),
+      download(await fromJson(undefined, $("#compactExport").checked), $("#presetId").value + ".json"),
   );
   $("#importJson").onchange =
     /* 選択ファイルの2MiB制限を確認してJSON欄へ読み込み、サーバー検証後にフォームへ反映する。失敗は通知し、保存はしない。 */ async (

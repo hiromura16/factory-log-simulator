@@ -24,3 +24,4 @@ fd = os.open(a.env_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
 with os.fdopen(fd, "w") as f:
     f.write(text)
 print("Created " + str(a.env_file.resolve()) + "; no login required")
+print("VM内の既定URL: ブラウザーで http://127.0.0.1:3643/ を開きます。APP_PORTを変更した場合はその番号を使います。")

@@ -1,6 +1,8 @@
 """資格情報を含まない初期設定と障害再現プリセットを生成する。"""
 
 from pathlib import Path
+
+from scripts.preset_catalog import write_catalog
 from config import FieldRule, AnomalyRule
 from models import Spec, Resource, Register
 
@@ -698,6 +700,11 @@ def build(kind, path):
         prerequisites = "公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。"
         if kind == "logs" and i == 23:
             prerequisites += " 配送エラーの再現には接続できない送信先を別途指定。既定のファイル出力では配送エラーにならない。"
+        if kind == "equipment" and i in {15, 22}:
+            checks.append(
+                "Modbusでは、欠測または未知の状態で変換できない番地を含む読取要求は例外4を返します。"
+                "他の番地だけを対象とする要求は引き続き読み取れます。"
+            )
         spec.description = (
             f"【想定】\n{purpose}の検証。{title}を想定。\n\n【生成内容・条件】\n"
             + "\n".join(conditions)
@@ -715,6 +722,7 @@ def build(kind, path):
         (path / (identity + ".json")).write_text(
             spec.model_dump_json(indent=2) + "\n"
         )
+    write_catalog(path)
     return values
 
 

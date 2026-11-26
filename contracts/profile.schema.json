@@ -1,5 +1,6 @@
 {
   "additionalProperties": false,
+  "description": "取得時の認証、設備の公開条件、イベントの送信先を指定する。",
   "properties": {
     "id": {
       "default": "default",
@@ -27,12 +28,12 @@
       ],
       "title": "取得APIの認証方式",
       "type": "string",
-      "description": "noneは取得用APIの認証なし、basicはユーザーとパスワード、bearerはAuthorization: Bearer、api_keyはX-API-Key。管理画面はログイン不要です。",
+      "description": "noneは取得用APIの認証なし、basicはユーザーとパスワード、bearerはAuthorization: Bearer、api_keyはX-API-Key。管理画面の認証は別に設定します。",
       "ui_hidden": false
     },
     "username": {
       "default": "source",
-      "description": "データ取得API専用のBasic認証ユーザー。管理画面はログイン不要です。",
+      "description": "データ取得API専用のBasic認証ユーザー。管理画面の認証は別に設定します。",
       "maxLength": 120,
       "title": "ユーザー名",
       "type": "string",

@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>付属のひな型一覧 | ログシミュレーター</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/help.css">
+  <script src="/static/help.js" defer></script>
+</head>
+<body class="help-page">
+  <a class="help-skip" href="#help-content">本文へ移動</a>
+  <div class="help-top">
+    <a class="help-home" href="/">ログシミュレーター</a>
+    <a href="/">アプリに戻る</a>
+  </div>
+  <div class="help-layout">
+    <nav class="help-nav" aria-label="ヘルプ"><a href="/help/index.html">初めて使う</a><a href="/help/presets.html">ひな型を選ぶ・作る</a><a href="/help/templates.html">JSONの書き方</a><a href="/help/settings.html">設定リファレンス</a><a href="/help/api.html">APIの使い方</a><a href="/help/glossary.html">用語集</a><a href="/help/ai.html">AIにひな型を頼む</a><a href="/help/mcp.html">CLI・MCP</a><a href="/help/install.html">VMへの導入</a><a href="/help/catalog.html" aria-current="page">付属のひな型一覧</a></nav>
+    <main class="help-content" id="help-content">
+      <nav class="help-outline" aria-label="このページ"><a href="#ひな型ごとの内容">ひな型ごとの内容</a></nav>
+      <div class="help-search" hidden><label for="help-filter">表を検索</label><input id="help-filter" type="search" placeholder="日本語、ID、JSONキー"><p id="help-results" role="status"></p></div>
+      <article><h1>付属のひな型一覧</h1>
+<p>迷ったときは<a href="/help/presets.html">ひな型を選ぶ・作る</a>を参照してください。
+アプリで保存したひな型はアプリの一覧から開きます。</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>表示名</th>
+<th>最大tick数</th>
+<th>生成する内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#01-normal">01-normal</a></td>
+<td>正常 / ローカル回転ログ / RFC5424</td>
+<td>手動停止まで</td>
+<td>ローカル回転ログ / RFC5424を想定</td>
+</tr>
+<tr>
+<td><a href="#02-normal">02-normal</a></td>
+<td>正常 / JSON Lines</td>
+<td>手動停止まで</td>
+<td>1tickに5件、書式jsonl、facility=16、severity=6。回転上限10MiB、バックアップ5本</td>
+</tr>
+<tr>
+<td><a href="#03-normal">03-normal</a></td>
+<td>正常 / プレーンログ</td>
+<td>手動停止まで</td>
+<td>1tickに5件、書式plain、facility=16、severity=6。回転上限10MiB、バックアップ5本</td>
+</tr>
+<tr>
+<td><a href="#04-normal">04-normal</a></td>
+<td>正常 / RFC3164</td>
+<td>手動停止まで</td>
+<td>1tickに5件、書式rfc3164、facility=16、severity=6。回転上限10MiB、バックアップ5本</td>
+</tr>
+<tr>
+<td><a href="#05-normal">05-normal</a></td>
+<td>正常 / errorレベル</td>
+<td>手動停止まで</td>
+<td>1tickに5件、書式rfc5424、facility=16、severity=3。回転上限10MiB、バックアップ5本</td>
+</tr>
+<tr>
+<td><a href="#06-normal">06-normal</a></td>
+<td>正常 / warningレベル</td>
+<td>手動停止まで</td>
+<td>1tickに5件、書式rfc5424、facility=16、severity=4。回転上限10MiB、バックアップ5本</td>
+</tr>
+<tr>
+<td><a href="#07-normal">07-normal</a></td>
+<td>正常 / facility local1</td>
+<td>手動停止まで</td>
+<td>1tickに5件、書式rfc5424、facility=17、severity=6。回転上限10MiB、バックアップ5本</td>
+</tr>
+<tr>
+<td><a href="#08-normal">08-normal</a></td>
+<td>正常 / 毎秒100件</td>
+<td>手動停止まで</td>
+<td>1tickに100件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本</td>
+</tr>
+<tr>
+<td><a href="#09-normal">09-normal</a></td>
+<td>正常 / 低頻度ログ</td>
+<td>手動停止まで</td>
+<td>低頻度ログを想定</td>
+</tr>
+<tr>
+<td><a href="#10-normal">10-normal</a></td>
+<td>正常 / 小容量ローテーション</td>
+<td>手動停止まで</td>
+<td>1tickに5件、書式rfc5424、facility=16、severity=6。回転上限1MiB、バックアップ3本</td>
+</tr>
+<tr>
+<td><a href="#11-normal">11-normal</a></td>
+<td>正常 / 独自メッセージ</td>
+<td>手動停止まで</td>
+<td>本文テンプレート: source={entity_id} sequence={sequence_no} measurement={value}</td>
+</tr>
+<tr>
+<td><a href="#12-normal">12-normal</a></td>
+<td>正常 / 日本語ログ</td>
+<td>手動停止まで</td>
+<td>日本語ログを想定</td>
+</tr>
+<tr>
+<td><a href="#13-anomaly">13-anomaly</a></td>
+<td>異常 / エラー集中</td>
+<td>手動停止まで</td>
+<td>1tickに100件、書式rfc5424、facility=16、severity=3。回転上限10MiB、バックアップ5本</td>
+</tr>
+<tr>
+<td><a href="#14-anomaly">14-anomaly</a></td>
+<td>異常 / 重複ログ</td>
+<td>手動停止まで</td>
+<td>3件ごとに同じevent_idと本文を重複出力</td>
+</tr>
+<tr>
+<td><a href="#15-anomaly">15-anomaly</a></td>
+<td>異常 / 壊れたヘッダー</td>
+<td>手動停止まで</td>
+<td>3件ごとにヘッダーを意図的に破損</td>
+</tr>
+<tr>
+<td><a href="#16-anomaly">16-anomaly</a></td>
+<td>異常 / 文字列へ異常値</td>
+<td>手動停止まで</td>
+<td>項目valueへset、値='ERROR'を生成位置0〜以降で適用。異常後の型検証を迂回=True</td>
+</tr>
+<tr>
+<td><a href="#17-anomaly">17-anomaly</a></td>
+<td>異常 / 遅い出力</td>
+<td>手動停止まで</td>
+<td>遅い出力を想定</td>
+</tr>
+<tr>
+<td><a href="#18-anomaly">18-anomaly</a></td>
+<td>異常 / warningの集中</td>
+<td>手動停止まで</td>
+<td>1tickに100件、書式rfc5424、facility=16、severity=4。回転上限10MiB、バックアップ5本</td>
+</tr>
+<tr>
+<td><a href="#19-anomaly">19-anomaly</a></td>
+<td>異常 / 固着した値</td>
+<td>手動停止まで</td>
+<td>項目valueへfreeze、値=Noneを生成位置0〜以降で適用。異常後の型検証を迂回=False</td>
+</tr>
+<tr>
+<td><a href="#20-anomaly">20-anomaly</a></td>
+<td>異常 / 日本語と改行</td>
+<td>手動停止まで</td>
+<td>日本語と改行を想定</td>
+</tr>
+<tr>
+<td><a href="#21-anomaly">21-anomaly</a></td>
+<td>異常 / 大きなメッセージ</td>
+<td>手動停止まで</td>
+<td>本文テンプレート: large-message large-message large-message large-message large-message large-message large-message large-messag…</td>
+</tr>
+<tr>
+<td><a href="#22-anomaly">22-anomaly</a></td>
+<td>異常 / 欠測値</td>
+<td>手動停止まで</td>
+<td>項目valueへnull、値=Noneを生成位置0〜以降で適用。異常後の型検証を迂回=False</td>
+</tr>
+<tr>
+<td><a href="#23-anomaly">23-anomaly</a></td>
+<td>異常 / 未知の状態</td>
+<td>手動停止まで</td>
+<td>項目statusへset、値='UNKNOWN'を生成位置0〜以降で適用。異常後の型検証を迂回=False</td>
+</tr>
+<tr>
+<td><a href="#24-anomaly">24-anomaly</a></td>
+<td>異常 / 送信エラーを保持</td>
+<td>手動停止まで</td>
+<td>送信エラーを保持を想定</td>
+</tr>
+</tbody>
+</table>
+<h2 id="ひな型ごとの内容">ひな型ごとの内容</h2>
+<h3 id="01-normal">01-normal</h3>
+<p><strong>正常 / ローカル回転ログ / RFC5424</strong> · <a href="/help/preset-files/01-normal.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。ローカル回転ログ / RFC5424を想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="02-normal">02-normal</h3>
+<p><strong>正常 / JSON Lines</strong> · <a href="/help/preset-files/02-normal.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。JSON Linesを想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに5件、書式jsonl、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="03-normal">03-normal</h3>
+<p><strong>正常 / プレーンログ</strong> · <a href="/help/preset-files/03-normal.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。プレーンログを想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに5件、書式plain、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="04-normal">04-normal</h3>
+<p><strong>正常 / RFC3164</strong> · <a href="/help/preset-files/04-normal.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。RFC3164を想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc3164、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="05-normal">05-normal</h3>
+<p><strong>正常 / errorレベル</strong> · <a href="/help/preset-files/05-normal.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。errorレベルを想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=3。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="06-normal">06-normal</h3>
+<p><strong>正常 / warningレベル</strong> · <a href="/help/preset-files/06-normal.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。warningレベルを想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=4。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="07-normal">07-normal</h3>
+<p><strong>正常 / facility local1</strong> · <a href="/help/preset-files/07-normal.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。facility local1を想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=17、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="08-normal">08-normal</h3>
+<p><strong>正常 / 毎秒100件</strong> · <a href="/help/preset-files/08-normal.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。毎秒100件を想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに100件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="09-normal">09-normal</h3>
+<p><strong>正常 / 低頻度ログ</strong> · <a href="/help/preset-files/09-normal.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。低頻度ログを想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期5000ms、最大tick数無制限。 1tickに1件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="10-normal">10-normal</h3>
+<p><strong>正常 / 小容量ローテーション</strong> · <a href="/help/preset-files/10-normal.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。小容量ローテーションを想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限1MiB、バックアップ3本。 本文テンプレート: entity={entity_id} status={status} value={value}。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="11-normal">11-normal</h3>
+<p><strong>正常 / 独自メッセージ</strong> · <a href="/help/preset-files/11-normal.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。独自メッセージを想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: source={entity_id} sequence={sequence_no} measurement={value}。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="12-normal">12-normal</h3>
+<p><strong>正常 / 日本語ログ</strong> · <a href="/help/preset-files/12-normal.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。日本語ログを想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: 設備={entity_id} 状態={status} 測定値={value} 検証ログ。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="13-anomaly">13-anomaly</h3>
+<p><strong>異常 / エラー集中</strong> · <a href="/help/preset-files/13-anomaly.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。エラー集中を想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに100件、書式rfc5424、facility=16、severity=3。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="14-anomaly">14-anomaly</h3>
+<p><strong>異常 / 重複ログ</strong> · <a href="/help/preset-files/14-anomaly.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。重複ログを想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。 3件ごとに同じevent_idと本文を重複出力。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="15-anomaly">15-anomaly</h3>
+<p><strong>異常 / 壊れたヘッダー</strong> · <a href="/help/preset-files/15-anomaly.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。壊れたヘッダーを想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。 3件ごとにヘッダーを意図的に破損。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="16-anomaly">16-anomaly</h3>
+<p><strong>異常 / 文字列へ異常値</strong> · <a href="/help/preset-files/16-anomaly.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。文字列へ異常値を想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。 項目valueへset、値='ERROR'を生成位置0〜以降で適用。異常後の型検証を迂回=True。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="17-anomaly">17-anomaly</h3>
+<p><strong>異常 / 遅い出力</strong> · <a href="/help/preset-files/17-anomaly.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。遅い出力を想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期5000ms、最大tick数無制限。 1tickに1件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="18-anomaly">18-anomaly</h3>
+<p><strong>異常 / warningの集中</strong> · <a href="/help/preset-files/18-anomaly.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。warningの集中を想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに100件、書式rfc5424、facility=16、severity=4。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="19-anomaly">19-anomaly</h3>
+<p><strong>異常 / 固着した値</strong> · <a href="/help/preset-files/19-anomaly.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。固着した値を想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。 項目valueへfreeze、値=Noneを生成位置0〜以降で適用。異常後の型検証を迂回=False。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="20-anomaly">20-anomaly</h3>
+<p><strong>異常 / 日本語と改行</strong> · <a href="/help/preset-files/20-anomaly.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。日本語と改行を想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: 設備={entity_id} 状態={status} 測定値={value} 検証ログ。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="21-anomaly">21-anomaly</h3>
+<p><strong>異常 / 大きなメッセージ</strong> · <a href="/help/preset-files/21-anomaly.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。大きなメッセージを想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: large-message large-message large-message large-message large-message large-message large-message large-message large-me。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="22-anomaly">22-anomaly</h3>
+<p><strong>異常 / 欠測値</strong> · <a href="/help/preset-files/22-anomaly.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。欠測値を想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。 項目valueへnull、値=Noneを生成位置0〜以降で適用。異常後の型検証を迂回=False。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="23-anomaly">23-anomaly</h3>
+<p><strong>異常 / 未知の状態</strong> · <a href="/help/preset-files/23-anomaly.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。未知の状態を想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。 項目statusへset、値='UNKNOWN'を生成位置0〜以降で適用。異常後の型検証を迂回=False。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。</li>
+</ul>
+<h3 id="24-anomaly">24-anomaly</h3>
+<p><strong>異常 / 送信エラーを保持</strong> · <a href="/help/preset-files/24-anomaly.json">JSONをダウンロード</a></p>
+<ul>
+<li><strong>想定</strong>　ログ収集・パース・ローテーション・配送失敗の扱いの検証。送信エラーを保持を想定。</li>
+<li><strong>生成内容・条件</strong>　更新周期1000ms、最大tick数無制限。 1tickに5件、書式rfc5424、facility=16、severity=6。回転上限10MiB、バックアップ5本。 本文テンプレート: entity={entity_id} status={status} value={value}。</li>
+<li><strong>確認事項</strong>　PRI・時刻・UTF-8・複数行のパースと、ローテーション後の継続収集を確認。 TCPはoctet counting/newlineを受信側と合わせる。UDP/TCPの送信完了は受信アプリの処理完了を保証しない。失敗時はpendingを保持。</li>
+<li><strong>実行前</strong>　公開・認証・送信先は別のプロファイルで指定し、保存後に停止・開始して適用。各条件はフォームとJSONで編集可能。 配送エラーの再現には接続できない送信先を別途指定。既定のファイル出力では配送エラーにならない。</li>
+</ul>
+</article>
+    </main>
+  </div>
+</body>
+</html>

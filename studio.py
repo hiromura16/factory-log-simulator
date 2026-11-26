@@ -13,7 +13,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.exceptions import RequestValidationError
 from fastapi.responses import (
     FileResponse,
     JSONResponse,
@@ -23,9 +22,17 @@ from fastapi.responses import (
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from models import Profile, Spec, TITLES, SECRETS
-from generation import generate_record, sample_offsets, validate_generation
+from config import ConfigurationError
+from generation import anomaly_warnings
+from generation import generate_record, sample_offsets
 from store import Store
+from operation_confirmation import CONFIRMATION_HEADER, install_operation_gate
+from api_support import (
+    install_error_handlers, install_help,
+    management_credentials, unauthorized_management,
+)
 from controller import Controller
+from validation import validate_source_spec
 
 
 # 接続ファイル取込の名前とBase64本文を制限する入力契約。
@@ -65,7 +72,7 @@ def schemas(kind):
         "output": "送信・保存方式",
     }
     hints = {
-        "auth_mode": "noneは取得用APIの認証なし、basicはユーザーとパスワード、bearerはAuthorization: Bearer、api_keyはX-API-Key。管理画面はログイン不要です。",
+        "auth_mode": "noneは取得用APIの認証なし、basicはユーザーとパスワード、bearerはAuthorization: Bearer、api_keyはX-API-Key。管理画面の認証は別に設定します。",
         "opc_auth": "anonymousは匿名読取、usernameは専用ユーザーで認証。username時はSignAndEncryptが必要です。",
         "opc_security": "noneは署名・暗号化なし。sign_encryptはBasic256Sha256で署名と暗号化。証明書と秘密鍵を配置し、クライアントも対応する証明書で接続します。",
         "output": "captureは永続記録だけ、fileはローカル回転ログ、udp/tcp/tlsはSyslog。UDP/TCPは受信アプリの処理完了を保証しません。MQTTはQoS1のブローカーACK、HTTPは2xx受付まで。",
@@ -232,48 +239,31 @@ def create_app(kind):
 
     @asynccontextmanager
     async def lifespan(app):
-        """保存した希望状態に従って再開し、終了時は希望状態を変更せずスレッドを止める。"""
-        desired = store.meta("desired")
-        if desired and desired.get("running") and desired.get("spec"):
-            controller.start(
-                Spec.model_validate(desired["spec"]), desired.get("revision")
-            )
-        elif desired is None and os.environ.get("AUTO_START") == "1":
-            defaults = next(iter(store.presets()), None)
-            controller.start(
-                Spec.model_validate(defaults["spec"]) if defaults else Spec()
-            )
+        """操作を待ち、終了時は実行スレッドを止めて保存済み設定を保持する。"""
         yield
-        # 終了時には利用者が指定した実行・停止の希望状態を変更せず保持する。
         controller.stop_event.set()
         if controller.thread:
             await __import__("asyncio").to_thread(controller.thread.join, 15)
 
-    app = FastAPI(title=TITLES[kind], lifespan=lifespan)
+    app = FastAPI(title=TITLES[kind], version="0.3.0", lifespan=lifespan, docs_url=None, redoc_url=None)
     app.state.controller = controller
     app.state.store = store
 
     # 入力エラーから位置・種類・説明だけを返し、生の入力値は含めない。
-    @app.exception_handler(RequestValidationError)
-    async def invalid(request, exc):
-        return JSONResponse(
-            {
-                "detail": [
-                    {"loc": e["loc"], "msg": e["msg"], "type": e["type"]}
-                    for e in exc.errors()
-                ]
-            },
-            422,
-        )
-
     # 入力値の制約違反を422応答へ変換する。
     @app.exception_handler(ValueError)
     async def invalid_value(request, exc):
-        return JSONResponse({"detail": str(exc)}, 422)
+        return JSONResponse({"detail": str(exc) if isinstance(exc, ConfigurationError) else "設定値の形式または組み合わせを確認してください。"}, 422)
 
     # 変更系要求のOrigin・JSON形式・容量を検査し、共通の応答ヘッダーを付ける。
+    credentials = management_credentials()
+    install_error_handlers(app)
+
     @app.middleware("http")
     async def protect(request, call_next):
+        denied = unauthorized_management(request, credentials, True)
+        if denied is not None:
+            return denied
         if request.method not in {"GET", "HEAD", "OPTIONS"}:
             origin = request.headers.get("origin")
             if origin and (
@@ -309,7 +299,10 @@ def create_app(kind):
 
         管理画面全体のログイン制御ではない。秘密値比較には定数時間比較を使う。
         """
-        p = controller.profile or store.profile()[0]
+        try:
+            p = controller.source_profile()
+        except KeyError:
+            raise HTTPException(503, "保存済みの公開設定を確認してください") from None
         mode = p.auth_mode
         ok = mode == "none"
         if mode == "basic":
@@ -333,13 +326,13 @@ def create_app(kind):
                 ok = False
         elif mode == "bearer":
             ok = bool(p.token) and hmac.compare_digest(
-                request.headers.get("authorization", ""),
-                "Bearer " + p.token.get_secret_value(),
+                request.headers.get("authorization", "").encode(),
+                ("Bearer " + p.token.get_secret_value()).encode(),
             )
         elif mode == "api_key":
             ok = bool(p.token) and hmac.compare_digest(
-                request.headers.get("x-api-key", ""),
-                p.token.get_secret_value(),
+                request.headers.get("x-api-key", "").encode(),
+                p.token.get_secret_value().encode(),
             )
         if not ok:
             raise HTTPException(
@@ -351,20 +344,35 @@ def create_app(kind):
             )
 
     app.mount("/static", StaticFiles(directory=root / "static"), name="static")
+    install_help(app, root, True, kind, credentials)
+    gate = install_operation_gate(
+        app, kind, store, Spec,
+        validate=lambda spec, _revision: validate_source_spec(kind, spec),
+    )
 
     # 静的な管理画面の入口を返す。
-    @app.get("/")
+    @app.get("/", include_in_schema=False)
     def index():
         return FileResponse(root / "static/index.html")
 
     # プロセスの応答状態とサービス種類を返す。
-    @app.get("/healthz")
+    @app.get(
+        "/healthz",
+        summary='動作確認',
+        tags=['動作確認・監視'],
+    )
     def health():
-        return {"status": "ok", "service": kind, "version": "0.1.0"}
+        """アプリがHTTPに応答することを示します。接続先や下流の処理結果は別に確認します。"""
+        return {"status": "ok", "service": kind, "version": "0.3.0"}
 
     # 種類別の接続先案内、表示スキーマ、既定設定を返す。
-    @app.get("/api/info")
+    @app.get(
+        "/api/info",
+        summary='アプリ情報・既定値',
+        tags=['動作確認・監視'],
+    )
     def info():
+        """このアプリに適用される設定、既定値、接続先の案内を返します。秘密情報は含みません。"""
         return {
             "kind": kind,
             "title": TITLES[kind],
@@ -391,18 +399,33 @@ def create_app(kind):
         }
 
     # コントローラーの現在状態を取得する。
-    @app.get("/api/state")
+    @app.get(
+        "/api/state",
+        summary='現在の実行状態',
+        tags=['実行・出力'],
+    )
     def state():
+        """開始時刻、状態、生成数と処理中のエラーを返します。停止状態でも保存済みデータは残ります。"""
         return controller.snapshot()
 
     # 秘密値を除いた保存プロファイル一覧を返す。
-    @app.get("/api/profiles")
+    @app.get(
+        "/api/profiles",
+        summary='公開・出力設定の一覧',
+        tags=['接続・公開設定'],
+    )
     def profiles():
+        """保存済み設定と版を返します。パスワードやトークンの値は含みません。"""
         return {"profiles": store.profiles()}
 
     # アプリ種類ごとの出力方式と接続先を検証してプロファイルを保存する。
-    @app.post("/api/profiles")
+    @app.post(
+        "/api/profiles",
+        summary='公開・出力設定を保存',
+        tags=['接続・公開設定'],
+    )
     def profile(p: Profile):
+        """同じIDで新しい版を保存します。取得認証と出力先は選んだ方式の設定から解決します。"""
         if set(p.clear_secrets) - SECRETS:
             raise HTTPException(422, "削除する認証情報名を確認してください")
         if p.output in {"udp", "tcp", "tls", "mqtt"} and (
@@ -443,22 +466,37 @@ def create_app(kind):
         return store.save_profile(p)
 
     # 保存済みの実行プリセット一覧を返す。
-    @app.get("/api/presets")
+    @app.get(
+        "/api/presets",
+        summary='ひな型一覧',
+        tags=['設定・ひな型'],
+    )
     def presets():
+        """同梱・保存済みのひな型と内容を返します。読み取りで生成や実行は始まりません。"""
         return {"presets": store.presets()}
 
     # 指定IDのプリセットを検証済み設定で保存する。
-    @app.post("/api/presets/{identity}")
+    @app.post(
+        "/api/presets/{identity}",
+        summary='ひな型を保存',
+        tags=['設定・ひな型'],
+    )
     def preset(identity: str, spec: Spec):
+        """IDは英数字・下線・ハイフンで64文字以内です。JSONを検証し、同じIDならひな型を更新します。"""
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", identity):
             raise HTTPException(422, "プリセットIDを確認してください")
-        validate_generation(spec.generator)
+        validate_source_spec(kind, spec)
         return store.save_preset(identity, spec)
 
     # 境界サンプルを生成し、実行を始めずにデータと異常の影響を確認する。
-    @app.post("/api/preview")
+    @app.post(
+        "/api/preview",
+        summary='実行前に生成の見本を見る',
+        tags=['設定・ひな型'],
+    )
     def preview(spec: Spec):
-        validate_generation(spec.generator)
+        """入力を検証し、先頭や異常条件の境界で合成した値を records に返します。writes は false です。実行先へ出力しません。"""
+        validate_source_spec(kind, spec)
         offsets = sorted({0, 1, 2, *sample_offsets(spec.generator)})[:12]
         records, hits = [], []
         log_preview = None
@@ -515,37 +553,63 @@ def create_app(kind):
         result = {
             "records": records,
             "anomaly_hits": hits,
+            "warnings": anomaly_warnings(spec.generator, prefix=("generator",)),
             "sequences": offsets,
             "writes": False,
             "validated_spec": spec.model_dump(mode="json"),
+            "compact_spec": {"version": spec.version, **spec.model_dump(mode="json", exclude_defaults=True)},
         }
         if log_preview is not None:
             result["log_preview"] = log_preview
         return result
 
     # 設定をコントローラーへ渡してバックグラウンド実行を開始する。
-    @app.post("/api/start")
-    def start(spec: Spec, profile_revision: int | None = Query(default=None, ge=1)):
+    @app.post(
+        "/api/start",
+        summary='生成・公開を開始',
+        tags=['実行・出力'],
+        responses={409: {'description': 'すでに実行中です'}},
+    )
+    def start(request: Request, spec: Spec, profile_revision: int | None = Query(default=None, ge=1)):
+        """設定を確定しバックグラウンドに開始を依頼します。現在の状態は GET /api/state で確認します。"""
         try:
-            return controller.start(spec, revision=profile_revision)
+            validate_source_spec(kind, spec)
+            operation = gate.assess("/api/start", spec, profile_revision)
+            gate.require(operation, request.headers.get(CONFIRMATION_HEADER))
+            return controller.start(spec, revision=operation.revision)
         except KeyError:
             raise HTTPException(404, "指定した出力先の版が見つかりません") from None
         except RuntimeError as e:
             raise HTTPException(409, str(e)) from None
 
     # 停止を要求し、停止待ちを含む現在状態を返す。
-    @app.post("/api/stop")
+    @app.post(
+        "/api/stop",
+        summary='生成・公開を停止',
+        tags=['実行・出力'],
+    )
     def stop():
+        """新しい生成を停止します。保存済みのデータと設定は残ります。curlではJSONの空オブジェクトを送れます。"""
         return controller.stop()
 
     # 実行状態のカウンターをPrometheus向けテキストで返す。
-    @app.get("/metrics", response_class=PlainTextResponse)
+    @app.get(
+        "/metrics", response_class=PlainTextResponse,
+        summary='Prometheus向けメトリクス',
+        tags=['動作確認・監視'],
+    )
     def metrics():
+        """生成や実行状態のカウンターをPrometheus向けテキストで返します。"""
         return f'source_ticks{{kind="{kind}"}} {controller.tick}\nsource_records{{kind="{kind}"}} {controller.produced}\n'
 
     # 接続専用領域に制限してファイルを排他的に作り、原子的に置き換える。
-    @app.post("/api/connection-files")
+    @app.post(
+        "/api/connection-files",
+        summary='接続補助ファイルを配置',
+        tags=['接続・公開設定'],
+    )
     def upload(value: Upload):
+        """相対名とBase64を含むJSONを受け付けます。デコード後1MiBまで。同名は置き換え、ファイルは権限600で保存します。"""
         folder = store.root / "connection-files"
         folder.mkdir(exist_ok=True, mode=0o700)
         target = (folder / value.name).resolve()
@@ -571,8 +635,13 @@ def create_app(kind):
         return {"name": value.name, "bytes": len(data), "permissions": "600"}
 
     # 取得認証後に、任意の配送状態で絞った最近のイベントを返す。
-    @app.get("/source/events")
+    @app.get(
+        "/source/events",
+        summary='最近のイベントを取得',
+        tags=['公開データの取得'],
+    )
     def events(request: Request, limit: int = 100, status: str | None = None):
+        """新しい順に返します。limit は1〜1000、既定100件です。status は完全一致で、payload は文字列です。"""
         authorize(request)
         if not 1 <= limit <= 1000:
             raise HTTPException(422, "limitは1〜1000")
@@ -588,8 +657,15 @@ def create_app(kind):
         return {"events": [dict(r) for r in rows]}
 
     # 取得認証後に、上限内のログ本文を時系列順のテキストとして返す。
-    @app.get("/source/logs/download")
+    @app.get(
+        "/source/logs/download",
+        summary='ログをUTF-8テキストで取得',
+        tags=['公開データの取得'],
+        response_class=Response,
+        responses={200: {'description': 'ログをUTF-8テキストで取得', 'content': {'text/plain': {'schema': {'type': 'string'}}}}},
+    )
     def logs(request: Request, limit: int = 1000):
+        """最後の指定件数を古い順に返します。limit は1〜10000、既定1000件です。"""
         authorize(request)
         if not 1 <= limit <= 10000:
             raise HTTPException(422, "limitは1〜10000")
@@ -604,8 +680,15 @@ def create_app(kind):
         )
 
     # 識別タグの範囲と形式を確認し、バーコードまたはQRのPNGを返す。
-    @app.get("/source/labels/{number}.png")
+    @app.get(
+        "/source/labels/{number}.png",
+        summary='標準タグのラベル画像を取得',
+        tags=['公開データの取得'],
+        response_class=Response,
+        responses={200: {'description': '標準タグのラベル画像を取得', 'content': {'image/png': {'schema': {'type': 'string', 'format': 'binary'}}}}, 404: {'description': '指定したタグが見つかりません'}},
+    )
     def label(request: Request, number: int, format: str = ""):
+        """0始まりの番号を指定します。format は qr、code128、ean13 を選べ、空欄はひな型の設定に従います。"""
         authorize(request)
         if (
             kind != "identification"

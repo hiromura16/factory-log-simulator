@@ -1,6 +1,34 @@
 # ログ発生器 / 回転ファイル・Syslog
 
-[プリセット一覧](presets/README.md) · [Dokploy配備手順](docs/dokploy-deploy.md) · [コード読解ガイド](docs/code-reading-guide.md)
+疑似ログをcaptureに記録して本文を読む手順を[初心者マニュアル](docs/user-manual.md)で確認できます。
+
+## 起動して最初の画面を開く
+
+Linux VMに Docker Compose を用意します。別端末からの接続やホスト側のマウントは[VM導入手順](docs/vm-compose.md)を参照してください。
+
+```sh
+python3 scripts/init_local.py --env-file .env
+docker compose up -d --build
+```
+
+VMで `http://127.0.0.1:3643/` を開きます。メニューの「ヘルプ」から、見本の出し方、設定、APIを調べられます。 別端末から管理操作をする場合は[管理画面の認証](docs/vm-compose.md#管理画面の認証)も設定します。
+
+開発時に直接起動する場合は Python 3.12〜3.14 と uv を使用します。必要なPythonは uv でインストールできます。
+
+```sh
+uv sync --frozen
+DATA_DIR=./data uv run --frozen uvicorn app:app --host 127.0.0.1 --port 3643
+```
+
+## 操作と設定の資料
+
+[8アプリの構成](docs/architecture.md)から役割と既定ポートを調べられます。
+
+- [初心者マニュアル](docs/user-manual.md) · [ひな型を選ぶ・作る](docs/preset-guide.md) · [付属のひな型一覧](presets/README.md)
+- [設定リファレンス](docs/settings-reference.md) · [JSONの書き方](docs/template-guide.md) · [AI向け作成ハーネス](docs/AI_TEMPLATE_HARNESS.md)
+- [APIの使い方](docs/api-guide.md) · [用語集](docs/glossary.md) · [コードを拡張する](docs/code-reading-guide.md) · [変更履歴](CHANGELOG.md) · [レビュー対応表](docs/quality-review.md)
+AIクライアント向けの接続方法は[CLI・MCPの使い方](docs/mcp.md)を参照してください。
+
 
 設備・MES・アプリケーションの疑似ログを作成し、収集・パース・再送を試験します。
 
@@ -51,17 +79,17 @@ uv run python scripts/init_local.py --env-file .env
 docker compose up -d --build
 ```
 
-`.env`のAPP_PORTが画面のポート、BIND_IPは既定127.0.0.1。管理画面と操作APIはログイン不要です。直接起動する場合:
+`.env`のAPP_PORTが画面のポート、BIND_IPは既定127.0.0.1。直接起動する場合は次のコマンドを使います。
 
 ```sh
-DATA_DIR="$PWD/data" AUTO_START=1 uv run uvicorn app:app --host 127.0.0.1 --port 8080 --workers 1
+DATA_DIR="$PWD/data" uv run uvicorn app:app --host 127.0.0.1 --port 8080 --workers 1
 ```
 
-1アプリ1プロセス・1実行。AUTO_START=1は初回に既定プリセットを開始。その後は保存済みの停止・実行状態を復元します。Docker再作成後もnamed volumeへ設定・データを保持。初期設定は小規模で、速度は保証値ではありません。interval_ms、batch_size、タグ/設備/件数等を増やす場合も、CPU・メモリ・容量上限を合わせて設定してください。
+1アプリ1プロセス・1実行。起動後は停止状態で、画面または操作APIからの開始を待ちます。Docker再作成後もnamed volumeへ設定・データを保持。初期設定は小規模で、速度は保証値ではありません。interval_ms、batch_size、タグ/設備/件数等を増やす場合も、CPU・メモリ・容量上限を合わせて設定してください。
 
 ## 認証・データと運用
 
-管理画面と`/api/*`はログイン不要。 ローカルまたは信頼済みの検証環境向けです。既定のloopback公開を維持し、他端末から利用する場合は追加認証と到達元制限を別途設けてください。インターネットへの直接公開は避けてください。取得用`/source/*`の認証はプロファイルでnone/basic/bearer/api_key（X-API-Key）から別途選択します。APIへの変更操作は同一オリジンとapplication/jsonを要求。`/healthz`と`/metrics`も認証不要です。暗号化HTTPが必要な経路では既存のTLS終端を使用してください。
+管理画面と `/api/*` の既定では認証を要求しません。[管理画面の認証](docs/vm-compose.md#管理画面の認証)を有効にすると、操作にもBasic認証が必要です。ローカルまたは信頼済みの検証環境向けです。既定のloopback公開を維持し、他端末から利用する場合は追加認証と到達元制限を別途設けてください。インターネットへの直接公開は避けてください。取得用`/source/*`の認証はプロファイルでnone/basic/bearer/api_key（X-API-Key）から別途選択します。APIへの変更操作は同一オリジンとapplication/jsonを要求。`/healthz` は稼働確認、`/metrics` は管理用のメトリクスです。暗号化HTTPが必要な経路では既存のTLS終端を使用してください。
 
 秘密情報はFernetで暗号化保存し、読み戻し・JSON書き出しから除外。同じ接続範囲なら未入力の資格情報を保持し、接続範囲が変われば引き継ぎません。clear_secretsで明示削除できます。証明書・秘密鍵・CAは画面からconnection-filesへ権限600で配置可能。
 
@@ -69,10 +97,14 @@ DATA_DIRにはsettings.sqlite3、source.key、connection-files、永続データ
 
 ホストメモリ余力（既定6GiB）、ディスク余力2GiB、storage_limit_mbを監視し、閾値で生成を停止します。Composeは既定512MiB/1CPU、非root、read-only root、ログ上限、負荷ガード連携用のラベルを設定。`storage_limit_mb`はDATA_DIR配下の上限で、別マウントのログはローテーションで制限します。
 
-`uv run pytest -q`と`uvx ruff check .`で検証。[検証記録](VALIDATION.json)に実接続と画面確認の範囲を記載しています。他ソースとの組み合わせとポート割り当ての参考例は[構成メモ](docs/architecture.md)を参照してください。実環境の接続情報は非公開の運用メモで管理してください。
+`uv run pytest -q`と`uvx ruff@0.17.6 check --select E4,E7,E9,F .`で検証。[検証記録](VALIDATION.json)に実接続と画面確認の範囲を記載しています。他ソースとの組み合わせとポート割り当ての参考例は[構成メモ](docs/architecture.md)を参照してください。実環境の接続情報は非公開の運用メモで管理してください。
 
 ## 外部監視用の管理ラベル
 
 Composeの管理ラベルは既定で `factory.guard.managed=true` です。外部監視側との合意が必要な場合は、非公開の配備設定で `FACTORY_GUARD_LABEL_PREFIX` を指定できます。例えば説明用の値 `synthetic-guard` を指定すると、`synthetic-guard.guard.managed=true` になります。
 
 既存の外部監視との互換性は未確認です。変更前に監視側が照合するラベル名と影響を確認してください。この設定は既存コンテナや監視設定を自動移行せず、デプロイも行いません。
+
+## ライセンス
+
+アプリ本体は[MITライセンス](LICENSE)です。同梱フォントとSwagger UIのライセンスは各配布ディレクトリにあります。

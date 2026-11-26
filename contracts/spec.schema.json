@@ -2,7 +2,40 @@
   "$defs": {
     "AnomalyRule": {
       "additionalProperties": false,
+      "description": "通常値へ、指定した範囲・頻度・条件で異常を適用する。",
       "properties": {
+        "$schema": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "JSONエディターの補完に使うスキーマのファイルパスまたはURL。アプリは取得せず、保存済み設定にも含めません。",
+          "title": "エディターのスキーマ参照",
+          "ui_hidden": true,
+          "x-editor-only": true
+        },
+        "_comment": {
+          "anyOf": [
+            {
+              "maxLength": 4000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "テンプレートに書ける編集者向けメモ。アプリの挙動を変えず、取込・保存・書き出しでは省かれます。",
+          "title": "エディター用のメモ",
+          "ui_hidden": true,
+          "x-editor-only": true
+        },
         "name": {
           "default": "異常注入",
           "maxLength": 120,
@@ -38,7 +71,7 @@
           ],
           "title": "異常の作り方",
           "type": "string",
-          "description": "set=値を置換、add=加算、multiply=倍率、ramp=開始位置から増加するドリフト、freeze=開始位置の値に固着、null=NULL、copy_from=指定位置の値をコピー、timestamp_shift=秒単位の時刻ずらし、omit=項目自体を欠落。"
+          "description": "set=値を置換、add=加算、multiply=倍率、ramp=開始位置から増加するドリフト、freeze=開始位置の値に固着、null=NULL、copy_from=指定位置の値をコピー、timestamp_shift=秒単位の時刻ずらし、omit=項目自体を欠落。加算・倍率・ドリフトは元の値が欠測・非数値の行では適用しません。"
         },
         "value": {
           "default": null,
@@ -112,6 +145,7 @@
     },
     "Business": {
       "additionalProperties": false,
+      "description": "ページ取得、差分更新、異常応答の試験条件を定義する。",
       "properties": {
         "resources": {
           "description": "公開するコレクション。指図・在庫・実績等を別URLと独自の列定義で用意できます。",
@@ -192,6 +226,41 @@
     },
     "Condition": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "operator": {
+                "enum": [
+                  "in"
+                ]
+              }
+            },
+            "required": [
+              "operator"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "array"
+                  },
+                  {
+                    "pattern": "^\\$",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "value"
+            ]
+          }
+        }
+      ],
+      "description": "先に生成した項目と比較し、一致時に値を置き換える設定。",
       "properties": {
         "field": {
           "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,62}$",
@@ -212,7 +281,7 @@
           ],
           "title": "比較方法",
           "type": "string",
-          "description": "eq=等しい、ne=異なる、gt/ge=超える/以上、lt/le=未満/以下、in=比較値の配列に含まれる。"
+          "description": "eq/neは一致・不一致、gt/ge/lt/leは大小比較、inは配列に含まれるかを判定します。大小比較では欠測値や比較できない型は不一致になります。inの比較値はJSON配列、または配列を参照する共有パラメーターを指定します。"
         },
         "value": {
           "default": null,
@@ -233,6 +302,7 @@
     },
     "Equipment": {
       "additionalProperties": false,
+      "description": "OPC UA／Modbusへ公開する装置の台数と挙動を定義する。",
       "properties": {
         "devices": {
           "default": 4,
@@ -311,6 +381,7 @@
     },
     "FaultOptions": {
       "additionalProperties": false,
+      "description": "処理や配送の障害を実行中に再現する。",
       "properties": {
         "enabled": {
           "default": false,
@@ -392,7 +463,151 @@
     },
     "FieldRule": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "generator": {
+                "enum": [
+                  "choice"
+                ]
+              }
+            },
+            "required": [
+              "generator"
+            ]
+          },
+          "then": {
+            "properties": {
+              "choices": {
+                "anyOf": [
+                  {
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  {
+                    "pattern": "^\\$",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "choices"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "generator": {
+                "enum": [
+                  "reference",
+                  "sum",
+                  "difference",
+                  "product"
+                ]
+              }
+            },
+            "required": [
+              "generator"
+            ]
+          },
+          "then": {
+            "properties": {
+              "sources": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "sources"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "generator": {
+                "enum": [
+                  "ratio"
+                ]
+              }
+            },
+            "required": [
+              "generator"
+            ]
+          },
+          "then": {
+            "properties": {
+              "sources": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            },
+            "required": [
+              "sources"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "generator": {
+                "enum": [
+                  "timestamp"
+                ]
+              }
+            },
+            "required": [
+              "generator"
+            ]
+          },
+          "then": {
+            "properties": {
+              "start": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "start"
+            ]
+          }
+        }
+      ],
+      "description": "1項目の生成方式と型を定義する。別の項目は定義順で参照する。",
       "properties": {
+        "$schema": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "JSONエディターの補完に使うスキーマのファイルパスまたはURL。アプリは取得せず、保存済み設定にも含めません。",
+          "title": "エディターのスキーマ参照",
+          "ui_hidden": true,
+          "x-editor-only": true
+        },
+        "_comment": {
+          "anyOf": [
+            {
+              "maxLength": 4000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "テンプレートに書ける編集者向けメモ。アプリの挙動を変えず、取込・保存・書き出しでは省かれます。",
+          "title": "エディター用のメモ",
+          "ui_hidden": true,
+          "x-editor-only": true
+        },
         "name": {
           "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,62}$",
           "title": "項目名",
@@ -676,6 +891,7 @@
     },
     "FileOptions": {
       "additionalProperties": false,
+      "description": "ファイルを書き出す形式、分割と完了通知を定義する。",
       "properties": {
         "formats": {
           "items": {
@@ -829,6 +1045,7 @@
     },
     "History": {
       "additionalProperties": false,
+      "description": "保存する履歴タグと時刻、品質、保存期間を指定する。",
       "properties": {
         "tags": {
           "description": "保存する生成項目。タグ名はdevice-001.value等になります。",
@@ -922,6 +1139,7 @@
     },
     "Identification": {
       "additionalProperties": false,
+      "description": "識別イベントとラベルを生成する条件を定義する。",
       "properties": {
         "tags": {
           "default": 100,
@@ -996,6 +1214,7 @@
     },
     "ImageOptions": {
       "additionalProperties": false,
+      "description": "合成画像の寸法・書式・パターンを定義する。",
       "properties": {
         "width": {
           "default": 320,
@@ -1093,6 +1312,7 @@
     },
     "Logs": {
       "additionalProperties": false,
+      "description": "ログ本文・書式・ローテーション・配送障害の設定を保持する。",
       "properties": {
         "format": {
           "default": "rfc5424",
@@ -1189,6 +1409,7 @@
     },
     "Predicate": {
       "additionalProperties": false,
+      "description": "生成済みの値が異常の適用条件に一致するかを定義する。",
       "properties": {
         "field": {
           "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,62}$",
@@ -1209,7 +1430,7 @@
           ],
           "title": "比較方法",
           "type": "string",
-          "description": "eq=等しい、ne=異なる、gt/ge=超える/以上、lt/le=未満/以下、in=比較値の配列に含まれる。"
+          "description": "eq/neは一致・不一致、gt/ge/lt/leは大小比較、inは配列に含まれるかを判定します。大小比較では欠測値や比較できない型は不一致になります。inの比較値はJSON配列、または配列を参照する共有パラメーターを指定します。"
         },
         "value": {
           "default": null,
@@ -1225,6 +1446,7 @@
     },
     "Register": {
       "additionalProperties": false,
+      "description": "生成項目をModbusアドレスとデータ型へマッピングする。",
       "properties": {
         "field": {
           "default": "value",
@@ -1313,6 +1535,7 @@
     },
     "Resource": {
       "additionalProperties": false,
+      "description": "業務APIで公開する1コレクションの名前、件数、項目定義を保持する。",
       "properties": {
         "name": {
           "default": "orders",
@@ -1348,7 +1571,40 @@
     },
     "RunSpec": {
       "additionalProperties": false,
+      "description": "生成件数、乱数、項目定義と出力先への参照を保持する。",
       "properties": {
+        "$schema": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "JSONエディターの補完に使うスキーマのファイルパスまたはURL。アプリは取得せず、保存済み設定にも含めません。",
+          "title": "エディターのスキーマ参照",
+          "ui_hidden": true,
+          "x-editor-only": true
+        },
+        "_comment": {
+          "anyOf": [
+            {
+              "maxLength": 4000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "テンプレートに書ける編集者向けメモ。アプリの挙動を変えず、取込・保存・書き出しでは省かれます。",
+          "title": "エディター用のメモ",
+          "ui_hidden": true,
+          "x-editor-only": true
+        },
         "version": {
           "const": 2,
           "default": 2,
@@ -1574,6 +1830,7 @@
     },
     "SqlOptions": {
       "additionalProperties": false,
+      "description": "書き込むテーブルと行の操作を定義する。",
       "properties": {
         "schema_name": {
           "default": "",
@@ -1607,6 +1864,7 @@
     },
     "StreamOptions": {
       "additionalProperties": false,
+      "description": "配信する本文の構造・トピック・再試行を指定する。",
       "properties": {
         "envelope": {
           "default": true,
@@ -1680,7 +1938,40 @@
     }
   },
   "additionalProperties": false,
+  "description": "1回の模擬ソース実行に使う生成条件と公開設定の参照を保持する。",
   "properties": {
+    "$schema": {
+      "anyOf": [
+        {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "JSONエディターの補完に使うスキーマのファイルパスまたはURL。アプリは取得せず、保存済み設定にも含めません。",
+      "title": "エディターのスキーマ参照",
+      "ui_hidden": true,
+      "x-editor-only": true
+    },
+    "_comment": {
+      "anyOf": [
+        {
+          "maxLength": 4000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "テンプレートに書ける編集者向けメモ。アプリの挙動を変えず、取込・保存・書き出しでは省かれます。",
+      "title": "エディター用のメモ",
+      "ui_hidden": true,
+      "x-editor-only": true
+    },
     "version": {
       "const": 1,
       "default": 1,

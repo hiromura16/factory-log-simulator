@@ -1,0 +1,72 @@
+{
+  "name": "MESアプリログ / JSON Lines / 毎秒10件",
+  "description": "【想定】MESのアプリケーションログをJSON Linesで回転ファイルに出力し、ログ収集基盤で取り込む。",
+  "interval_ms": 1000,
+  "batch_size": 10,
+  "generator": {
+    "run_key": "meslog-001",
+    "seed": 8,
+    "fields": [
+      {
+        "name": "id",
+        "data_type": "string",
+        "generator": "record_id",
+        "primary_key": true,
+        "length": 64
+      },
+      {
+        "name": "level",
+        "data_type": "string",
+        "generator": "choice",
+        "choices": [
+          "INFO",
+          "WARN",
+          "ERROR"
+        ],
+        "weights": [
+          90,
+          8,
+          2
+        ],
+        "length": 8
+      },
+      {
+        "name": "station_no",
+        "data_type": "integer",
+        "generator": "integer",
+        "minimum": 1,
+        "maximum": 12
+      },
+      {
+        "name": "station",
+        "data_type": "string",
+        "generator": "template",
+        "template": "ST-{station_no:02d}",
+        "length": 8
+      },
+      {
+        "name": "work_order",
+        "data_type": "string",
+        "generator": "template",
+        "template": "WO-{sequence:06d}",
+        "length": 16
+      },
+      {
+        "name": "elapsed_ms",
+        "data_type": "integer",
+        "generator": "integer",
+        "minimum": 5,
+        "maximum": 400
+      }
+    ]
+  },
+  "logs": {
+    "format": "jsonl",
+    "hostname": "mes-app-01",
+    "app_name": "mes-core",
+    "message_template": "station={station} wo={work_order} level={level} elapsed_ms={elapsed_ms}",
+    "rotate_mb": 10,
+    "backups": 5
+  },
+  "max_ticks": 2
+}

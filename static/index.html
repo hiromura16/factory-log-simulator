@@ -6,7 +6,9 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Factory Source Studio</title>
     <link rel="stylesheet" href="/static/style.css" />
+    <link rel="stylesheet" href="/static/help.css" />
     <script src="/static/comparison.js" defer></script>
+    <script src="/static/api-client.js" defer></script>
     <script src="/static/app.js" defer></script>
   </head>
   <body>
@@ -28,16 +30,19 @@
           ><button data-tab="monitor" class="nav">実行状況・取得方法</button>
           <button class="nav" type="button" data-tab="comparison">見本を比較</button>
         </nav>
+        <a class="help-entry" href="/help/">ヘルプ・設定・API</a>
         <div class="aside-note">
           <strong>入力項目の説明</strong>
           <p>
             項目にマウスを重ねるか、?へキーボードで移動すると説明を表示します。
           </p>
           <p id="contextHelp">プリセットを選ぶと想定・確認事項を表示します。</p>
+          <a class="help-entry" href="/help/glossary.html">用語集</a>
         </div>
       </aside>
       <main>
         <div id="notice" role="status" aria-live="polite"></div>
+        <p id="previewWarnings" class="note" style="white-space: pre-wrap" role="status" hidden></p>
         <section id="generate" class="tab active">
           <h2>ログをつくる</h2>
           <section class="card" aria-labelledby="basicTitle">
@@ -162,7 +167,12 @@
             </label>
             <div class="actionbar">
               <button id="applyJson">JSONを画面へ反映</button>
+              <label class="checkline">
+                <input type="checkbox" id="compactExport" checked />
+                既定値を省略
+              </label>
               <button id="exportJson">JSONを書き出す</button>
+              <a class="help-entry" href="/help/templates.html">JSONの書き方</a>
             </div>
           </div>
         </section>

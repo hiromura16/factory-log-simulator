@@ -84,7 +84,7 @@ def test_profiles_secrets_presets_without_login(tmp_path):
         )
 
 
-def test_snapshot_pages_filter_delta_and_source_auth():
+def test_snapshot_pages_filter_delta_and_source_auth(confirmed_start):
     """ページ取得と差分取得の境界を検証する。
 
     取得途中に行を更新し、ページに重複がなく、更新が差分に現れる
@@ -97,7 +97,7 @@ def test_snapshot_pages_filter_delta_and_source_auth():
         spec.business.resources = [Resource(name="orders", rows=12)]
         spec.business.updates_per_tick = 0
         assert (
-            c.post("/api/start", json=spec.model_dump(mode="json")).status_code
+            confirmed_start(c, spec.model_dump(mode="json")).status_code
             == 200
         )
         assert wait(c)["status"] in {"running", "stopped"}
@@ -142,7 +142,7 @@ def test_snapshot_pages_filter_delta_and_source_auth():
             ).model_dump(mode="json")
             | {"token": "source-test-token"},
         )
-        c.post("/api/start", json=spec.model_dump(mode="json"))
+        confirmed_start(c, spec.model_dump(mode="json"))
         wait(c)
         assert c.get("/source/rest/orders").status_code == 401
         assert (
@@ -155,7 +155,7 @@ def test_snapshot_pages_filter_delta_and_source_auth():
         )
 
 
-def test_historian_raw_aggregate_gap_and_resume():
+def test_historian_raw_aggregate_gap_and_resume(confirmed_start):
     """欠測を含む履歴から生データと時間集約を取得する。
 
     一定値でサンプルを生成し、欠測で件数が減ることと、時間集約が
@@ -170,7 +170,7 @@ def test_historian_raw_aggregate_gap_and_resume():
         s.history.missing_every = 3
         s.generator.fields[5].generator = "constant"
         s.generator.fields[5].value = 50
-        c.post("/api/start", json=s.model_dump(mode="json"))
+        confirmed_start(c, s.model_dump(mode="json"))
         assert wait(c)["status"] in {"running", "stopped"}
         rows = c.get(
             "/source/history/raw",
@@ -199,7 +199,7 @@ def test_historian_raw_aggregate_gap_and_resume():
         c.post("/api/stop", json={})
 
 
-def test_fault_response_and_builtins():
+def test_fault_response_and_builtins(confirmed_start):
     """制限の模擬設定が429と再試行までの秒数を返すか検証する。"""
     app = create_app("api")
     with TestClient(app) as c:
@@ -207,7 +207,7 @@ def test_fault_response_and_builtins():
         s.business.fault = "rate_limit"
         s.business.fault_every = 1
         s.business.resources[0].rows = 2
-        c.post("/api/start", json=s.model_dump(mode="json"))
+        confirmed_start(c, s.model_dump(mode="json"))
         wait(c)
         r = c.get("/source/rest/orders")
         assert r.status_code == 429 and r.headers["Retry-After"] == "2"

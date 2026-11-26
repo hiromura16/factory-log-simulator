@@ -1,0 +1,1389 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>設定リファレンス | ログシミュレーター</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/help.css">
+  <script src="/static/help.js" defer></script>
+</head>
+<body class="help-page">
+  <a class="help-skip" href="#help-content">本文へ移動</a>
+  <div class="help-top">
+    <a class="help-home" href="/">ログシミュレーター</a>
+    <a href="/">アプリに戻る</a>
+  </div>
+  <div class="help-layout">
+    <nav class="help-nav" aria-label="ヘルプ"><a href="/help/index.html">初めて使う</a><a href="/help/presets.html">ひな型を選ぶ・作る</a><a href="/help/templates.html">JSONの書き方</a><a href="/help/settings.html" aria-current="page">設定リファレンス</a><a href="/help/api.html">APIの使い方</a><a href="/help/glossary.html">用語集</a><a href="/help/ai.html">AIにひな型を頼む</a><a href="/help/mcp.html">CLI・MCP</a><a href="/help/install.html">VMへの導入</a><a href="/help/catalog.html">付属のひな型一覧</a></nav>
+    <main class="help-content" id="help-content">
+      <nav class="help-outline" aria-label="このページ"><a href="#公開-生成ひな型">公開・生成ひな型</a><a href="#公開-出力設定">公開・出力設定</a></nav>
+      <div class="help-search" hidden><label for="help-filter">表を検索</label><input id="help-filter" type="search" placeholder="日本語、ID、JSONキー"><p id="help-results" role="status"></p></div>
+      <article><h1>設定リファレンス</h1>
+<p>画面の表示名、JSONキー、意味、制約、既定値を確認できます。
+接続方式や選択した形式によって表示される設定が変わります。
+共通形式の別アプリ用の項目も掲載しています。該当する出力方式で使う設定を選んでください。</p>
+<p><a href="/help/templates.html">JSONの書き方</a> · <a href="/help/presets.html">ひな型の選び方</a></p>
+<h2 id="公開-生成ひな型">公開・生成ひな型</h2>
+<table>
+<thead>
+<tr>
+<th>JSONキー</th>
+<th>画面名と用途</th>
+<th>型・入力条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>$schema</code></td>
+<td><strong>エディターのスキーマ参照</strong>　JSONエディターの補完に使うスキーマのファイルパスまたはURL。アプリは取得せず、保存済み設定にも含めません。 <strong>画面に表示されません。</strong></td>
+<td>文字列 / null。省略可。既定 null。最長 2048</td>
+</tr>
+<tr>
+<td><code>_comment</code></td>
+<td><strong>エディター用のメモ</strong>　テンプレートに書ける編集者向けメモ。アプリの挙動を変えず、取込・保存・書き出しでは省かれます。 <strong>画面に表示されません。</strong></td>
+<td>文字列 / null。省略可。既定 null。最長 4000</td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td><strong>設定バージョン</strong>　このアプリはバージョン2のプリセットJSONを使用します。 <strong>画面に表示されません。</strong></td>
+<td>整数。省略可。既定 1。固定値 1</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><strong>表示名</strong>　設定・プリセットの表示名。</td>
+<td>文字列。省略可。既定 &quot;小さく試す&quot;。最長 120</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><strong>用途・メモ</strong>　想定状況、生成内容、確認事項、実行条件を記載します。選択時に全文を表示。</td>
+<td>文字列。省略可。既定 &quot;&quot;。最長 2000</td>
+</tr>
+<tr>
+<td><code>profile_id</code></td>
+<td><strong>Profile Id</strong>　公開・認証・送信先の保存済みプロファイルID。</td>
+<td>文字列。省略可。既定 &quot;default&quot;。書式 &quot;^[A-Za-z0-9_-]{1,64}$&quot;</td>
+</tr>
+<tr>
+<td><code>interval_ms</code></td>
+<td><strong>Interval Ms</strong>　1tickの更新周期。実際の速度はデータ数・接続先・生成内容に依存します。</td>
+<td>整数。省略可。既定 1000。最小 10。最大 60000</td>
+</tr>
+<tr>
+<td><code>batch_size</code></td>
+<td><strong>バッチ件数</strong>　ログ/RFIDの1tickあたりイベント数。設備・履歴は設備数を使用します。</td>
+<td>整数。省略可。既定 5。最小 1。最大 1000</td>
+</tr>
+<tr>
+<td><code>max_ticks</code></td>
+<td><strong>Max Ticks</strong>　0は停止操作まで継続。指定するとそのtick数で終了します。</td>
+<td>整数。省略可。既定 0。最小 0。最大 100000000</td>
+</tr>
+<tr>
+<td><code>storage_limit_mb</code></td>
+<td><strong>Storage Limit Mb</strong>　このアプリのデータ領域の上限MiB。超過時は停止し、既存記録を保持。</td>
+<td>整数。省略可。既定 1024。最小 16。最大 102400</td>
+</tr>
+<tr>
+<td><code>generator</code></td>
+<td><strong>任意項目とデータ異常</strong>　共通の任意項目・分布・乱数シード・時刻・データ異常定義。</td>
+<td>データの生成条件（RunSpec）。省略可</td>
+</tr>
+<tr>
+<td><code>equipment</code></td>
+<td><strong>設備プロトコル設定</strong>　設備プロトコル設定の設定。現在の型と選択肢に合わせて指定します。 <strong>画面に表示されません。</strong></td>
+<td>設備と通信異常（Equipment）。省略可</td>
+</tr>
+<tr>
+<td><code>business</code></td>
+<td><strong>業務API設定</strong>　業務API設定の設定。現在の型と選択肢に合わせて指定します。 <strong>画面に表示されません。</strong></td>
+<td>業務APIと模擬障害（Business）。省略可</td>
+</tr>
+<tr>
+<td><code>history</code></td>
+<td><strong>時系列保存設定</strong>　時系列保存設定の設定。現在の型と選択肢に合わせて指定します。 <strong>画面に表示されません。</strong></td>
+<td>履歴と品質（History）。省略可</td>
+</tr>
+<tr>
+<td><code>logs</code></td>
+<td><strong>ログ設定</strong>　ログ設定の設定。現在の型と選択肢に合わせて指定します。</td>
+<td>ログ形式とローテーション（Logs）。省略可</td>
+</tr>
+<tr>
+<td><code>identification</code></td>
+<td><strong>作業者・RFID設定</strong>　作業者・RFID設定の設定。現在の型と選択肢に合わせて指定します。 <strong>画面に表示されません。</strong></td>
+<td>タグと読取経路（Identification）。省略可</td>
+</tr>
+</tbody>
+</table>
+<h3 id="異常デ-タの条件-anomalyrule">異常データの条件（AnomalyRule）</h3>
+<table>
+<thead>
+<tr>
+<th>JSONキー</th>
+<th>画面名と用途</th>
+<th>型・入力条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AnomalyRule.$schema</code></td>
+<td><strong>エディターのスキーマ参照</strong>　JSONエディターの補完に使うスキーマのファイルパスまたはURL。アプリは取得せず、保存済み設定にも含めません。 <strong>画面に表示されません。</strong></td>
+<td>文字列 / null。省略可。既定 null。最長 2048</td>
+</tr>
+<tr>
+<td><code>AnomalyRule._comment</code></td>
+<td><strong>エディター用のメモ</strong>　テンプレートに書ける編集者向けメモ。アプリの挙動を変えず、取込・保存・書き出しでは省かれます。 <strong>画面に表示されません。</strong></td>
+<td>文字列 / null。省略可。既定 null。最長 4000</td>
+</tr>
+<tr>
+<td><code>AnomalyRule.name</code></td>
+<td><strong>表示名</strong>　一覧と実行履歴に表示する名前。業種や工場の種類を指定する必要はありません。</td>
+<td>文字列。省略可。既定 &quot;異常注入&quot;。最短 1。最長 120</td>
+</tr>
+<tr>
+<td><code>AnomalyRule.enabled</code></td>
+<td><strong>異常注入を有効にする</strong>　無効なら、このルールまたは障害設定を適用しません。通常生成との比較に使用できます。</td>
+<td>真偽値。省略可。既定 true</td>
+</tr>
+<tr>
+<td><code>AnomalyRule.field</code></td>
+<td><strong>異常を注入する項目名</strong>　生成するデータ項目の名前。正常行の生成後に変更するため、先行項目だけでなく任意の生成項目を指定できます。</td>
+<td>文字列。必須。書式 &quot;^[A-Za-z_][A-Za-z0-9_]{0,62}$&quot;</td>
+</tr>
+<tr>
+<td><code>AnomalyRule.operation</code></td>
+<td><strong>異常の作り方</strong>　set=値を置換、add=加算、multiply=倍率、ramp=開始位置から増加するドリフト、freeze=開始位置の値に固着、null=NULL、copy_from=指定位置の値をコピー、timestamp_shift=秒単位の時刻ずらし、omit=項目自体を欠落。加算・倍率・ドリフトは元の値が欠測・非数値の行では適用しません。</td>
+<td>文字列。省略可。既定 &quot;set&quot;。選択肢 &quot;set&quot; / &quot;add&quot; / &quot;multiply&quot; / &quot;ramp&quot; / &quot;freeze&quot; / &quot;null&quot; / &quot;copy_from&quot; / &quot;timestamp_shift&quot; / &quot;omit&quot;</td>
+</tr>
+<tr>
+<td><code>AnomalyRule.value</code></td>
+<td><strong>置換値 / 増分 / 倍率 / 秒数 JSON</strong>　setの値、add/rampの増分、multiplyの倍率、timestamp_shiftの秒数、copy_fromの実行内コピー元位置（0始まり）を指定。$parameter参照も可能。freeze/null/omitでは使いません。</td>
+<td>JSON値。省略可。既定 null</td>
+</tr>
+<tr>
+<td><code>AnomalyRule.from_row</code></td>
+<td><strong>異常の開始位置（0始まり）</strong>　この実行内のレコード位置。20なら21件目から適用。start_sequenceとは別で、分割実行時は実行内の位置として評価します。</td>
+<td>整数。省略可。既定 0。最小 0。最大 100000000</td>
+</tr>
+<tr>
+<td><code>AnomalyRule.to_row</code></td>
+<td><strong>異常の終了位置（含む）</strong>　空欄は最後まで。例: from_row=20、to_row=29なら10件の異常期間です。</td>
+<td>整数 / null。省略可。既定 null。最小 0。最大 100000000</td>
+</tr>
+<tr>
+<td><code>AnomalyRule.every</code></td>
+<td><strong>何件ごとに異常を適用するか</strong>　開始位置から何件ごとに適用するか。1は全件、10は10件ごと。probabilityと組み合わせて断続的な異常を作ります。</td>
+<td>整数。省略可。既定 1。最小 1。最大 100000000</td>
+</tr>
+<tr>
+<td><code>AnomalyRule.probability</code></td>
+<td><strong>異常が発生する確率</strong>　適用位置・条件を満たした行に対する0〜1の確率。同じrun_keyとseedなら再現可能です。</td>
+<td>数値。省略可。既定 1。最小 0。最大 1</td>
+</tr>
+<tr>
+<td><code>AnomalyRule.when</code></td>
+<td><strong>異常を適用する条件</strong>　生成後の値を比較し、一致する場合だけ異常を適用します。先に適用した異常の結果も参照できます。then_valueの指定は不要です。</td>
+<td>異常を適用する条件（Predicate） / null。省略可。既定 null</td>
+</tr>
+<tr>
+<td><code>AnomalyRule.bypass_validation</code></td>
+<td><strong>型・必須検証を意図的に外す</strong>　数値欄へ文字列、主キーへNULL等の不正値を作る場合に有効化。送信JSONは構文上有効のままですが、DBや受信側は拒否し得ます。omitはこの設定に関係なく項目を欠落させます。</td>
+<td>真偽値。省略可。既定 false</td>
+</tr>
+</tbody>
+</table>
+<h3 id="業務apiと模擬障害-business">業務APIと模擬障害（Business）</h3>
+<table>
+<thead>
+<tr>
+<th>JSONキー</th>
+<th>画面名と用途</th>
+<th>型・入力条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Business.resources</code></td>
+<td><strong>Resources</strong>　公開するコレクション。指図・在庫・実績等を別URLと独自の列定義で用意できます。 <strong>このアプリでは適用外。</strong></td>
+<td>配列［コレクション（Resource）］。省略可。最小件数 1。最大件数 30</td>
+</tr>
+<tr>
+<td><code>Business.updates_per_tick</code></td>
+<td><strong>Updates Per Tick</strong>　各tickで更新するレコード数。0は固定データ。idは維持し、値・revisionを更新します。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 2。最小 0。最大 10000</td>
+</tr>
+<tr>
+<td><code>Business.delete_every_ticks</code></td>
+<td><strong>Delete Every Ticks</strong>　0は削除なし。指定tickごとに1件を論理削除し、deltaの削除通知を試験。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 0。最小 0</td>
+</tr>
+<tr>
+<td><code>Business.cursor_ttl_seconds</code></td>
+<td><strong>Cursor Ttl Seconds</strong>　署名付きページングカーソルの有効期限。期限切れは410です。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 600。最小 1。最大 86400</td>
+</tr>
+<tr>
+<td><code>Business.page_size</code></td>
+<td><strong>Page Size</strong>　既定のページ件数。snapshot基準のページングで更新中も同じ集合を読みます。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 100。最小 1。最大 1000</td>
+</tr>
+<tr>
+<td><code>Business.fault</code></td>
+<td><strong>Fault</strong>　Faultの設定。現在の型と選択肢に合わせて指定します。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;none&quot;。選択肢 &quot;none&quot; / &quot;rate_limit&quot; / &quot;server_error&quot; / &quot;unauthorized&quot; / &quot;delay&quot; / &quot;duplicate_page&quot; / &quot;skip_page&quot; / &quot;truncate_json&quot; / &quot;cursor_expired&quot;</td>
+</tr>
+<tr>
+<td><code>Business.fault_every</code></td>
+<td><strong>Fault Every</strong>　データ取得APIへのリクエスト何回ごとに異常を返すか。管理UIの通信は含みません。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 5。最小 1</td>
+</tr>
+<tr>
+<td><code>Business.fault_delay_ms</code></td>
+<td><strong>Fault Delay Ms</strong>　API異常=delayの待機時間。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 1000。最小 0。最大 10000</td>
+</tr>
+</tbody>
+</table>
+<h3 id="値を上書きする条件-condition">値を上書きする条件（Condition）</h3>
+<table>
+<thead>
+<tr>
+<th>JSONキー</th>
+<th>画面名と用途</th>
+<th>型・入力条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Condition.field</code></td>
+<td><strong>比較する先行項目</strong>　すでに生成された項目名。例: status。</td>
+<td>文字列。必須。書式 &quot;^[A-Za-z_][A-Za-z0-9_]{0,62}$&quot;</td>
+</tr>
+<tr>
+<td><code>Condition.operator</code></td>
+<td><strong>比較方法</strong>　eq/neは一致・不一致、gt/ge/lt/leは大小比較、inは配列に含まれるかを判定します。大小比較では欠測値や比較できない型は不一致になります。inの比較値はJSON配列、または配列を参照する共有パラメーターを指定します。</td>
+<td>文字列。省略可。既定 &quot;eq&quot;。選択肢 &quot;eq&quot; / &quot;ne&quot; / &quot;gt&quot; / &quot;ge&quot; / &quot;lt&quot; / &quot;le&quot; / &quot;in&quot;</td>
+</tr>
+<tr>
+<td><code>Condition.value</code></td>
+<td><strong>固定値 / 比較値 JSON</strong>　文字列は&quot;sample&quot;、数値は123、真偽値はtrue、空値はnull。&quot;$parameter&quot;で共有値を参照できます。</td>
+<td>JSON値。省略可。既定 null</td>
+</tr>
+<tr>
+<td><code>Condition.then_value</code></td>
+<td><strong>一致したときの値 JSON</strong>　条件が真の場合に上書きする値。&quot;$parameter&quot;の参照も可能です。</td>
+<td>JSON値。省略可。既定 null</td>
+</tr>
+</tbody>
+</table>
+<h3 id="設備と通信異常-equipment">設備と通信異常（Equipment）</h3>
+<table>
+<thead>
+<tr>
+<th>JSONキー</th>
+<th>画面名と用途</th>
+<th>型・入力条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Equipment.devices</code></td>
+<td><strong>Devices</strong>　模擬設備数。Modbus device IDは1から設備数まで。OPC UAにも同数の設備オブジェクトを公開。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 4。最小 1。最大 247</td>
+</tr>
+<tr>
+<td><code>Equipment.registers</code></td>
+<td><strong>Registers</strong>　データ項目とレジスターの対応表。領域内でアドレス幅が重複しないよう指定します。 <strong>このアプリでは適用外。</strong></td>
+<td>配列［Modbusレジスター（Register）］。省略可。最大件数 100</td>
+</tr>
+<tr>
+<td><code>Equipment.quality</code></td>
+<td><strong>品質コード</strong>　Goodは正常、Badは利用不適、Uncertainは確実でない値。設備用はOPC UAの実StatusCodeへ変換します。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;Good&quot;。選択肢 &quot;Good&quot; / &quot;BadSensorFailure&quot; / &quot;UncertainLastUsableValue&quot;</td>
+</tr>
+<tr>
+<td><code>Equipment.quality_from_tick</code></td>
+<td><strong>Quality From Tick</strong>　このtick以降に品質コードを適用します。0は開始直後。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 0。最小 0</td>
+</tr>
+<tr>
+<td><code>Equipment.quality_until_tick</code></td>
+<td><strong>Quality Until Tick</strong>　0は最後まで。このtickを過ぎるとGoodへ戻ります。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 0。最小 0</td>
+</tr>
+<tr>
+<td><code>Equipment.offline_from_tick</code></td>
+<td><strong>Offline From Tick</strong>　0は切断なし。このtick以降、指定期間だけプロトコル待受を停止し再接続を試験。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 0。最小 0</td>
+</tr>
+<tr>
+<td><code>Equipment.offline_ticks</code></td>
+<td><strong>Offline Ticks</strong>　切断状態を続けるtick数。その後は同じノード・アドレスで待受を再開。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 5。最小 1。最大 10000</td>
+</tr>
+<tr>
+<td><code>Equipment.read_delay_ms</code></td>
+<td><strong>Read Delay Ms</strong>　Modbusの読取応答を遅延させる時間。OPC UAでは更新周期を使用してください。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 0。最小 0。最大 5000</td>
+</tr>
+<tr>
+<td><code>Equipment.writable</code></td>
+<td><strong>Writable</strong>　クライアントの書き込みを許可。生成周期の次の更新で生成値へ戻ります。 <strong>このアプリでは適用外。</strong></td>
+<td>真偽値。省略可。既定 false</td>
+</tr>
+</tbody>
+</table>
+<h3 id="実行処理の障害-faultoptions">実行処理の障害（FaultOptions）</h3>
+<table>
+<thead>
+<tr>
+<th>JSONキー</th>
+<th>画面名と用途</th>
+<th>型・入力条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FaultOptions.enabled</code></td>
+<td><strong>異常注入を有効にする</strong>　無効なら、このルールまたは障害設定を適用しません。通常生成との比較に使用できます。 <strong>このアプリでは適用外。</strong></td>
+<td>真偽値。省略可。既定 false</td>
+</tr>
+<tr>
+<td><code>FaultOptions.stage</code></td>
+<td><strong>障害を注入する段階</strong>　before_batch: SQL/ファイルは処理前、ストリームはoutbox記録後の送信前。after_write: SQLはCOMMIT前、ファイルはマニフェスト前、ストリームは送信ACK後の配送済み記録前。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;before_batch&quot;。選択肢 &quot;before_batch&quot; / &quot;after_write&quot;</td>
+</tr>
+<tr>
+<td><code>FaultOptions.action</code></td>
+<td><strong>障害の動作</strong>　none=処理障害なし（不正ファイル指定だけ使う場合等）、fail=意図的な例外で停止、delay=指定時間だけ待機。ストリームの再試行を指定するとfailを再試行でき、ACK消失時には重複送信し得ます。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;none&quot;。選択肢 &quot;none&quot; / &quot;fail&quot; / &quot;delay&quot;</td>
+</tr>
+<tr>
+<td><code>FaultOptions.from_batch</code></td>
+<td><strong>障害の開始バッチ（1始まり）</strong>　2なら2バッチ目から注入。バッチ件数を小さくすると、正常分を先に配送・確定してから障害を発生させられます。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 1。最小 1。最大 100000000</td>
+</tr>
+<tr>
+<td><code>FaultOptions.every_batches</code></td>
+<td><strong>何バッチごとに障害を発生させるか</strong>　1は毎バッチ、5は開始バッチから5バッチごと。最大回数と組み合わせて一過性・継続障害を作れます。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 1。最小 1。最大 100000000</td>
+</tr>
+<tr>
+<td><code>FaultOptions.max_occurrences</code></td>
+<td><strong>障害の最大回数</strong>　1は1回だけ。0は回数制限なし。再試行時も回数に含みます。永続的な障害は0、一過性の障害は1等を指定。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 1。最小 0。最大 1000000</td>
+</tr>
+<tr>
+<td><code>FaultOptions.delay_ms</code></td>
+<td><strong>模擬遅延 ms</strong>　action=delayの待機時間。実行時間の上限と停止要求を確認しながら待機します。実際の接続先を遅くする設定ではありません。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 1000。最小 0。最大 60000</td>
+</tr>
+<tr>
+<td><code>FaultOptions.artifact_mode</code></td>
+<td><strong>意図的に不正なファイルを作る</strong>　ファイルツール専用。JSON切断 / 不正UTF-8 / CSVヘッダー不一致 / 画像切断 / 拡張子不一致 / マニフェストSHA256不一致。取り込み側の検知・隔離を試験します。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;none&quot;。選択肢 &quot;none&quot; / &quot;truncate_json&quot; / &quot;invalid_json_utf8&quot; / &quot;csv_header_mismatch&quot; / &quot;truncate_image&quot; / &quot;wrong_image_extension&quot; / &quot;manifest_checksum_mismatch&quot;</td>
+</tr>
+</tbody>
+</table>
+<h3 id="項目と値の生成方法-fieldrule">項目と値の生成方法（FieldRule）</h3>
+<table>
+<thead>
+<tr>
+<th>JSONキー</th>
+<th>画面名と用途</th>
+<th>型・入力条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FieldRule.$schema</code></td>
+<td><strong>エディターのスキーマ参照</strong>　JSONエディターの補完に使うスキーマのファイルパスまたはURL。アプリは取得せず、保存済み設定にも含めません。 <strong>画面に表示されません。</strong></td>
+<td>文字列 / null。省略可。既定 null。最長 2048</td>
+</tr>
+<tr>
+<td><code>FieldRule._comment</code></td>
+<td><strong>エディター用のメモ</strong>　テンプレートに書ける編集者向けメモ。アプリの挙動を変えず、取込・保存・書き出しでは省かれます。 <strong>画面に表示されません。</strong></td>
+<td>文字列 / null。省略可。既定 null。最長 4000</td>
+</tr>
+<tr>
+<td><code>FieldRule.name</code></td>
+<td><strong>項目名</strong>　英字または下線で始まる英数字・下線、63文字まで。SQLの列名・CSVヘッダー・JSONキーになります。項目間参照にもこの名前を使います。</td>
+<td>文字列。必須。書式 &quot;^[A-Za-z_][A-Za-z0-9_]{0,62}$&quot;</td>
+</tr>
+<tr>
+<td><code>FieldRule.data_type</code></td>
+<td><strong>値の型</strong>　string / integer / number / decimal / boolean / datetime / json。decimalは正確な小数文字列、日時はUTC ISO形式。SQL保存時は対応する列の型に変換します。</td>
+<td>文字列。省略可。既定 &quot;string&quot;。選択肢 &quot;string&quot; / &quot;integer&quot; / &quot;number&quot; / &quot;decimal&quot; / &quot;boolean&quot; / &quot;datetime&quot; / &quot;json&quot;</td>
+</tr>
+<tr>
+<td><code>FieldRule.generator</code></td>
+<td><strong>生成ルール</strong>　record_id=再現可能なキー、uuid=UUID、sequence=連番、integer/uniform/normal=分布、choice=重み付き選択、boolean=確率、constant=固定、template=書式、timestamp=時刻、reference/四則演算=先行項目から派生。</td>
+<td>文字列。省略可。既定 &quot;constant&quot;。選択肢 &quot;record_id&quot; / &quot;uuid&quot; / &quot;sequence&quot; / &quot;integer&quot; / &quot;uniform&quot; / &quot;normal&quot; / &quot;choice&quot; / &quot;boolean&quot; / &quot;constant&quot; / &quot;template&quot; / &quot;timestamp&quot; / &quot;reference&quot; / &quot;sum&quot; / &quot;difference&quot; / &quot;product&quot; / &quot;ratio&quot;</td>
+</tr>
+<tr>
+<td><code>FieldRule.primary_key</code></td>
+<td><strong>SQL 主キー</strong>　テーブル作成時の主キー定義。upsert / update / deleteには接続先と一致する主キーが必要です。複数の項目を指定すると複合キーになります。 <strong>画面に表示されません。</strong></td>
+<td>真偽値。省略可。既定 false</td>
+</tr>
+<tr>
+<td><code>FieldRule.length</code></td>
+<td><strong>文字数の上限</strong>　stringの最大文字数。生成結果を検証し、新規SQLテーブルの列長にも使用します。1〜4000。</td>
+<td>整数。省略可。既定 255。最小 1。最大 4000</td>
+</tr>
+<tr>
+<td><code>FieldRule.precision</code></td>
+<td><strong>小数の精度</strong>　decimal全体の桁数。1〜38。SQLのNUMERIC(precision,scale)に対応します。</td>
+<td>整数。省略可。既定 18。最小 1。最大 38</td>
+</tr>
+<tr>
+<td><code>FieldRule.scale</code></td>
+<td><strong>小数桁数 / 丸め桁数</strong>　decimalの小数桁数、numberの丸め桁数。decimalでは精度以下に指定します。</td>
+<td>整数。省略可。既定 3。最小 0。最大 18</td>
+</tr>
+<tr>
+<td><code>FieldRule.minimum</code></td>
+<td><strong>最小値 / パラメーター参照</strong>　integer / uniformの最小値。数値または$countのような共有パラメーター参照。</td>
+<td>整数 / 数値 / 文字列。省略可。既定 0</td>
+</tr>
+<tr>
+<td><code>FieldRule.maximum</code></td>
+<td><strong>最大値 / パラメーター参照</strong>　integer / uniformの最大値。integerは両端を含みます。数値または$parameter。</td>
+<td>整数 / 数値 / 文字列。省略可。既定 100</td>
+</tr>
+<tr>
+<td><code>FieldRule.mean</code></td>
+<td><strong>平均</strong>　正規分布normalの平均値。例: 50、または$value_mean。</td>
+<td>整数 / 数値 / 文字列。省略可。既定 50</td>
+</tr>
+<tr>
+<td><code>FieldRule.stddev</code></td>
+<td><strong>標準偏差</strong>　normalのばらつき。0なら常に平均値。0以上、または共有パラメーター参照。</td>
+<td>整数 / 数値 / 文字列。省略可。既定 5</td>
+</tr>
+<tr>
+<td><code>FieldRule.start</code></td>
+<td><strong>開始値 / 開始日時</strong>　sequenceでは数値、timestampではタイムゾーン付きISO日時。例: 2026-11-13T09:00:00+09:00。$start_timeで参照も可能。</td>
+<td>整数 / 数値 / 文字列。省略可。既定 0</td>
+</tr>
+<tr>
+<td><code>FieldRule.step</code></td>
+<td><strong>増分 / 秒間隔</strong>　sequenceは開始値に足す量、timestampは時刻を進める秒数。小数・負数・$parameterも指定できます。</td>
+<td>整数 / 数値 / 文字列。省略可。既定 1</td>
+</tr>
+<tr>
+<td><code>FieldRule.group_size</code></td>
+<td><strong>同じ連番値を使う件数</strong>　sequence / timestampの増分を適用する前にまとめる件数。10なら0〜9番が同じ時刻・連番値になります。1以上または$parameter。</td>
+<td>整数 / 文字列。省略可。既定 1</td>
+</tr>
+<tr>
+<td><code>FieldRule.modulo</code></td>
+<td><strong>連番値の繰り返し周期</strong>　0は繰り返さない。10なら連番のインデックスが0〜9を繰り返します。sequence / timestampに適用。</td>
+<td>整数 / 文字列。省略可。既定 0</td>
+</tr>
+<tr>
+<td><code>FieldRule.probability</code></td>
+<td><strong>true の確率</strong>　boolean生成器のtrueの割合。0〜1、または$parameter。例: 0.02。</td>
+<td>数値 / 文字列。省略可。既定 0.5</td>
+</tr>
+<tr>
+<td><code>FieldRule.choices</code></td>
+<td><strong>選択肢 JSON / 参照</strong>　例: [&quot;ok&quot;,&quot;warning&quot;,&quot;ng&quot;]、または&quot;$statuses&quot;。型はデータ型と合わせてください。</td>
+<td>配列［JSON値］ / 文字列。省略可</td>
+</tr>
+<tr>
+<td><code>FieldRule.weights</code></td>
+<td><strong>選択肢の重み JSON</strong>　例: [95,4,1]。選択肢と同じ個数で、0以上かつ合計が正。空の配列[]なら均等に選びます。</td>
+<td>配列［数値］。省略可</td>
+</tr>
+<tr>
+<td><code>FieldRule.value</code></td>
+<td><strong>固定値 / 比較値 JSON</strong>　文字列は&quot;sample&quot;、数値は123、真偽値はtrue、空値はnull。&quot;$parameter&quot;で共有値を参照できます。</td>
+<td>JSON値。省略可。既定 null</td>
+</tr>
+<tr>
+<td><code>FieldRule.template</code></td>
+<td><strong>文字列テンプレート</strong>　例: DEV-{entity_no:05d}。先行項目、共有パラメーター、{sequence}、{record_id}を参照できます。属性アクセスや任意コードは実行しません。</td>
+<td>文字列。省略可。既定 &quot;{sequence}&quot;。最長 2048</td>
+</tr>
+<tr>
+<td><code>FieldRule.sources</code></td>
+<td><strong>参照元の項目名 JSON</strong>　例: [&quot;amount&quot;,&quot;unit_price&quot;]。referenceは先頭、sum / difference / product / ratioは指定した先行項目を使用します。ratioは2項目で分母0不可。</td>
+<td>配列［文字列］。省略可。最大件数 32</td>
+</tr>
+<tr>
+<td><code>FieldRule.null_probability</code></td>
+<td><strong>NULL の確率</strong>　生成結果をNULLに置き換える確率。0〜1。SQL主キーには指定できません。</td>
+<td>数値。省略可。既定 0。最小 0。最大 1</td>
+</tr>
+<tr>
+<td><code>FieldRule.condition</code></td>
+<td><strong>条件による値の上書き</strong>　有効にすると先行項目と比較し、一致する場合にthen_valueを採用。条件不一致時は通常の生成値を使用します。</td>
+<td>値を上書きする条件（Condition） / null。省略可。既定 null</td>
+</tr>
+</tbody>
+</table>
+<h3 id="ファイルの形式と完了通知-fileoptions">ファイルの形式と完了通知（FileOptions）</h3>
+<table>
+<thead>
+<tr>
+<th>JSONキー</th>
+<th>画面名と用途</th>
+<th>型・入力条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FileOptions.formats</code></td>
+<td><strong>出力形式 JSON</strong>　[&quot;json&quot;,&quot;csv&quot;,&quot;image&quot;]から1つ以上。画像だけ、JSONとCSVだけ、など自由に組み合わせられます。 <strong>このアプリでは適用外。</strong></td>
+<td>配列［文字列］。省略可。最小件数 1。最大件数 3。選択肢 &quot;json&quot; / &quot;csv&quot; / &quot;image&quot;</td>
+</tr>
+<tr>
+<td><code>FileOptions.records_per_file</code></td>
+<td><strong>ファイルあたりの件数</strong>　JSON配列 / JSONL / CSVを分割する最大件数。objectモードは常に1レコード1ファイル。メモリ上限のため小さくなる場合があります。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 100。最小 1。最大 10000</td>
+</tr>
+<tr>
+<td><code>FileOptions.path_template</code></td>
+<td><strong>出力サブディレクトリ</strong>　例: {run_key}/{job_id}。共有パラメーターも使用可能。相対パスのみ、..は禁止。job_idを含めると再実行時の衝突を避けられます。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;{run_key}/{job_id}&quot;。最長 512</td>
+</tr>
+<tr>
+<td><code>FileOptions.filename_template</code></td>
+<td><strong>ファイル名テンプレート</strong>　例: {sequence:010d}-{record_id}。拡張子は自動付加。バッチ先頭の項目・共有値・run_key・job_idを参照可能。重複名はエラーになるので連番等を含めます。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;{sequence:010d}-{record_id}&quot;。最長 256</td>
+</tr>
+<tr>
+<td><code>FileOptions.json_mode</code></td>
+<td><strong>JSON の格納形式</strong>　array=配列、object=1レコード1ファイル、jsonl=1行1レコード。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;array&quot;。選択肢 &quot;array&quot; / &quot;object&quot; / &quot;jsonl&quot;</td>
+</tr>
+<tr>
+<td><code>FileOptions.json_pretty</code></td>
+<td><strong>JSON の整形</strong>　array / objectを字下げして見やすくします。JSONLでは無効。ファイルサイズが増えます。 <strong>このアプリでは適用外。</strong></td>
+<td>真偽値。省略可。既定 false</td>
+</tr>
+<tr>
+<td><code>FileOptions.json_template</code></td>
+<td><strong>JSON 構造テンプレート</strong>　nullなら生成行をそのまま出力。例: {&quot;device&quot;:&quot;$row.entity_id&quot;,&quot;metrics&quot;:{&quot;value&quot;:&quot;$row.value&quot;},&quot;key&quot;:&quot;$meta.record_key&quot;}。$parameters.xも利用可能。 <strong>このアプリでは適用外。</strong></td>
+<td>JSON値。省略可。既定 null</td>
+</tr>
+<tr>
+<td><code>FileOptions.compression</code></td>
+<td><strong>JSON / CSV 圧縮</strong>　noneまたはgzip。gzip時は.json.gz / .csv.gz等になり、画像・sidecar・manifestは圧縮しません。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;none&quot;。選択肢 &quot;none&quot; / &quot;gzip&quot;</td>
+</tr>
+<tr>
+<td><code>FileOptions.csv_delimiter</code></td>
+<td><strong>CSV 区切り文字</strong>　1文字。例: , または ;。タブ区切りはJSON編集で\tを指定できます。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;,&quot;。最短 1。最長 1</td>
+</tr>
+<tr>
+<td><code>FileOptions.csv_quotechar</code></td>
+<td><strong>CSV 引用文字</strong>　通常は二重引用符。1文字で指定します。区切り・改行を含む値はCSVライターが処理します。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;&quot;&quot;。最短 1。最長 1</td>
+</tr>
+<tr>
+<td><code>FileOptions.csv_quoting</code></td>
+<td><strong>CSV 引用規則</strong>　minimal=必要なセル、all=全セル、nonnumeric=文字列セルを引用します。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;minimal&quot;。選択肢 &quot;minimal&quot; / &quot;all&quot; / &quot;nonnumeric&quot;</td>
+</tr>
+<tr>
+<td><code>FileOptions.csv_header</code></td>
+<td><strong>CSV ヘッダー行</strong>　有効なら最初に項目名を書き込みます。列順はデータ項目の順序です。 <strong>このアプリでは適用外。</strong></td>
+<td>真偽値。省略可。既定 true</td>
+</tr>
+<tr>
+<td><code>FileOptions.csv_null_value</code></td>
+<td><strong>CSV のNULL表現</strong>　空文字が既定。例: NULL、\N。JSON値はJSON文字列としてセルへ保存します。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;&quot;。最長 255</td>
+</tr>
+<tr>
+<td><code>FileOptions.csv_newline</code></td>
+<td><strong>CSV 改行コード</strong>　LFまたはCRLF。読み込み先の仕様に合わせて指定します。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;LF&quot;。選択肢 &quot;LF&quot; / &quot;CRLF&quot;</td>
+</tr>
+<tr>
+<td><code>FileOptions.csv_encoding</code></td>
+<td><strong>CSV 文字コード</strong>　utf-8-sigはBOM付きUTF-8でExcel等向け。utf-8はBOMなし。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;utf-8-sig&quot;。選択肢 &quot;utf-8&quot; / &quot;utf-8-sig&quot;</td>
+</tr>
+<tr>
+<td><code>FileOptions.write_sidecars</code></td>
+<td><strong>画像のメタデータ保存</strong>　画像ごとの.meta.jsonにレコード・record_key・疑似欠陥ラベルを保存。画像は実物の検査写真ではなく人工パターンです。 <strong>このアプリでは適用外。</strong></td>
+<td>真偽値。省略可。既定 true</td>
+</tr>
+<tr>
+<td><code>FileOptions.write_manifest</code></td>
+<td><strong>完了マニフェスト保存</strong>　各バッチの全ファイル保存後に.ready.jsonを最後に作成します。下流はこれを取り込みの目印にできます。SHA256とサイズを記録します。 <strong>このアプリでは適用外。</strong></td>
+<td>真偽値。省略可。既定 true</td>
+</tr>
+<tr>
+<td><code>FileOptions.image</code></td>
+<td><strong>疑似検査画像の条件</strong>　格子・グラデーション・ドットの人工画像を再現可能に生成します。外部画像検索やAI APIは使用しません。 <strong>このアプリでは適用外。</strong></td>
+<td>画像の生成（ImageOptions）。省略可</td>
+</tr>
+</tbody>
+</table>
+<h3 id="履歴と品質-history">履歴と品質（History）</h3>
+<table>
+<thead>
+<tr>
+<th>JSONキー</th>
+<th>画面名と用途</th>
+<th>型・入力条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>History.tags</code></td>
+<td><strong>Tags</strong>　保存する生成項目。タグ名はdevice-001.value等になります。 <strong>このアプリでは適用外。</strong></td>
+<td>配列［文字列］。省略可。最小件数 1。最大件数 100</td>
+</tr>
+<tr>
+<td><code>History.devices</code></td>
+<td><strong>Devices</strong>　時系列を作る設備数。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 4。最小 1。最大 1000</td>
+</tr>
+<tr>
+<td><code>History.initial_samples</code></td>
+<td><strong>Initial Samples</strong>　開始時に作る過去サンプルの時点数。タグ・設備数を掛けた総点数は上限で検証します。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 1000。最小 0。最大 1000000</td>
+</tr>
+<tr>
+<td><code>History.sample_seconds</code></td>
+<td><strong>Sample Seconds</strong>　疑似イベント時刻のサンプリング間隔秒。更新周期とは別に指定できます。 <strong>このアプリでは適用外。</strong></td>
+<td>数値。省略可。既定 1。最小 0.01。最大 86400</td>
+</tr>
+<tr>
+<td><code>History.source_time_field</code></td>
+<td><strong>Source Time Field</strong>　空欄はサンプリング間隔から時刻を計算。生成項目名を指定するとその日時と異常ルールを使用します。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;&quot;</td>
+</tr>
+<tr>
+<td><code>History.shift_every</code></td>
+<td><strong>Shift Every</strong>　指定時点ごとにタイムスタンプをずらします。0は変更なし。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 0。最小 0</td>
+</tr>
+<tr>
+<td><code>History.timestamp_shift_seconds</code></td>
+<td><strong>Timestamp Shift Seconds</strong>　時刻をずらす秒数。負数は遅延・順序逆転。 <strong>このアプリでは適用外。</strong></td>
+<td>数値。省略可。既定 0</td>
+</tr>
+<tr>
+<td><code>History.retention_days</code></td>
+<td><strong>Retention Days</strong>　サンプルの保持期間。古いサンプルを定期的に削除します。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 90。最小 1。最大 3650</td>
+</tr>
+<tr>
+<td><code>History.quality</code></td>
+<td><strong>品質コード</strong>　Goodは正常、Badは利用不適、Uncertainは確実でない値。設備用はOPC UAの実StatusCodeへ変換します。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;Good&quot;。選択肢 &quot;Good&quot; / &quot;Bad&quot; / &quot;Uncertain&quot;</td>
+</tr>
+<tr>
+<td><code>History.bad_every</code></td>
+<td><strong>Bad Every</strong>　0は品質コード変更なし。指定時点ごとにqualityの異常コードを付加します。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 0。最小 0</td>
+</tr>
+<tr>
+<td><code>History.missing_every</code></td>
+<td><strong>Missing Every</strong>　指定時点ごとにサンプルを保存しません。欠測とNULLを区別する試験。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 0。最小 0</td>
+</tr>
+</tbody>
+</table>
+<h3 id="タグと読取経路-identification">タグと読取経路（Identification）</h3>
+<table>
+<thead>
+<tr>
+<th>JSONキー</th>
+<th>画面名と用途</th>
+<th>型・入力条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Identification.tags</code></td>
+<td><strong>Tags</strong>　模擬タグ・品目の種類数。同じタグが複数読取機を通過します。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 100。最小 1。最大 100000</td>
+</tr>
+<tr>
+<td><code>Identification.readers</code></td>
+<td><strong>Readers</strong>　通過順に並べた読取機・工程・ゾーン名。 <strong>このアプリでは適用外。</strong></td>
+<td>配列［文字列］。省略可。最小件数 1。最大件数 100</td>
+</tr>
+<tr>
+<td><code>Identification.operators</code></td>
+<td><strong>Operators</strong>　架空の作業者ID一覧。実在者の個人情報は使用しません。 <strong>このアプリでは適用外。</strong></td>
+<td>配列［文字列］。省略可。最小件数 1。最大件数 10000</td>
+</tr>
+<tr>
+<td><code>Identification.barcode</code></td>
+<td><strong>ラベルの方式</strong>　code128は任意のタグ文字列、ean13はチェックディジット付き13桁、qrは二次元コード。PNGをラベルAPIから取得できます。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;code128&quot;。選択肢 &quot;code128&quot; / &quot;ean13&quot; / &quot;qr&quot;</td>
+</tr>
+<tr>
+<td><code>Identification.duplicate_every</code></td>
+<td><strong>Duplicate Every</strong>　指定件ごとに同じevent_idを再送し、二重読取を再現します。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 0。最小 0</td>
+</tr>
+<tr>
+<td><code>Identification.drop_every</code></td>
+<td><strong>Drop Every</strong>　指定件ごとにイベントを生成結果から落とし、読取漏れを再現。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 0。最小 0</td>
+</tr>
+<tr>
+<td><code>Identification.wrong_reader_every</code></td>
+<td><strong>Wrong Reader Every</strong>　指定件ごとに予定外の読取機名を出力します。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 0。最小 0</td>
+</tr>
+<tr>
+<td><code>Identification.unauthorized_every</code></td>
+<td><strong>Unauthorized Every</strong>　指定件ごとに未登録作業者を出力します。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 0。最小 0</td>
+</tr>
+</tbody>
+</table>
+<h3 id="画像の生成-imageoptions">画像の生成（ImageOptions）</h3>
+<table>
+<thead>
+<tr>
+<th>JSONキー</th>
+<th>画面名と用途</th>
+<th>型・入力条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ImageOptions.width</code></td>
+<td><strong>画像の幅 px</strong>　32〜4096ピクセル。大きな画像とノイズは生成負荷が増えます。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 320。最小 32。最大 4096</td>
+</tr>
+<tr>
+<td><code>ImageOptions.height</code></td>
+<td><strong>画像の高さ px</strong>　32〜4096ピクセル。出力容量と生成速度に影響します。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 240。最小 32。最大 4096</td>
+</tr>
+<tr>
+<td><code>ImageOptions.format</code></td>
+<td><strong>画像形式</strong>　png=可逆圧縮、jpeg=非可逆圧縮。JSON / CSVと同じrecord_keyで対応付けます。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;png&quot;。選択肢 &quot;png&quot; / &quot;jpeg&quot;</td>
+</tr>
+<tr>
+<td><code>ImageOptions.pattern</code></td>
+<td><strong>人工画像パターン</strong>　grid=格子、gradient=色の傾斜、dots=点群。背景色と前景色を変更できます。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;grid&quot;。選択肢 &quot;grid&quot; / &quot;gradient&quot; / &quot;dots&quot;</td>
+</tr>
+<tr>
+<td><code>ImageOptions.noise</code></td>
+<td><strong>画素ノイズ強度</strong>　0はなし、1〜64は各RGB成分に加える最大ゆらぎ。CPU負荷が高くなるため小さい値から試します。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 0。最小 0。最大 64</td>
+</tr>
+<tr>
+<td><code>ImageOptions.defect_probability</code></td>
+<td><strong>疑似欠陥の確率</strong>　0〜1。選ばれた画像に傷状の線を描き、sidecarにsynthetic_defectを記録します。 <strong>このアプリでは適用外。</strong></td>
+<td>数値。省略可。既定 0.05。最小 0。最大 1</td>
+</tr>
+<tr>
+<td><code>ImageOptions.every</code></td>
+<td><strong>画像生成の間引き</strong>　1は全レコード、10はシーケンス番号が10の倍数のときのみ生成。大量の表データと少数画像を組み合わせられます。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 1。最小 1。最大 1000000</td>
+</tr>
+<tr>
+<td><code>ImageOptions.quality</code></td>
+<td><strong>JPEG 品質</strong>　10〜100。PNGでは品質設定の効果はありません。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 90。最小 10。最大 100</td>
+</tr>
+<tr>
+<td><code>ImageOptions.background</code></td>
+<td><strong>背景色</strong>　#RRGGBB形式。例: #182a3a。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;#182a3a&quot;。書式 &quot;^#[0-9A-Fa-f]{6}$&quot;</td>
+</tr>
+<tr>
+<td><code>ImageOptions.foreground</code></td>
+<td><strong>パターン色</strong>　格子・点・グラデーション終端の#RRGGBB色。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;#55a69b&quot;。書式 &quot;^#[0-9A-Fa-f]{6}$&quot;</td>
+</tr>
+<tr>
+<td><code>ImageOptions.defect_color</code></td>
+<td><strong>疑似欠陥の色</strong>　傷状の線に使う#RRGGBB色。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;#ef463c&quot;。書式 &quot;^#[0-9A-Fa-f]{6}$&quot;</td>
+</tr>
+</tbody>
+</table>
+<h3 id="ログ形式とロ-テ-ション-logs">ログ形式とローテーション（Logs）</h3>
+<table>
+<thead>
+<tr>
+<th>JSONキー</th>
+<th>画面名と用途</th>
+<th>型・入力条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Logs.format</code></td>
+<td><strong>ログ書式</strong>　png=可逆圧縮、jpeg=非可逆圧縮。JSON / CSVと同じrecord_keyで対応付けます。</td>
+<td>文字列。省略可。既定 &quot;rfc5424&quot;。選択肢 &quot;jsonl&quot; / &quot;plain&quot; / &quot;rfc5424&quot; / &quot;rfc3164&quot;</td>
+</tr>
+<tr>
+<td><code>Logs.facility</code></td>
+<td><strong>Facility</strong>　Syslog facility。local0=16。severityと合わせてPRIを作ります。</td>
+<td>整数。省略可。既定 16。最小 0。最大 23</td>
+</tr>
+<tr>
+<td><code>Logs.severity</code></td>
+<td><strong>Severity</strong>　Syslog severity。0=emergency、3=error、4=warning、6=info、7=debug。</td>
+<td>整数。省略可。既定 6。最小 0。最大 7</td>
+</tr>
+<tr>
+<td><code>Logs.hostname</code></td>
+<td><strong>Hostname</strong>　ログに記載する模擬ホスト名。実ホストの個人情報は読み取りません。</td>
+<td>文字列。省略可。既定 &quot;factory-device&quot;。書式 &quot;^[A-Za-z0-9_.-]{1,255}$&quot;</td>
+</tr>
+<tr>
+<td><code>Logs.app_name</code></td>
+<td><strong>App Name</strong>　Syslog APP-NAME。</td>
+<td>文字列。省略可。既定 &quot;mes-demo&quot;。書式 &quot;^[A-Za-z0-9_.-]{1,48}$&quot;</td>
+</tr>
+<tr>
+<td><code>Logs.message_template</code></td>
+<td><strong>Message Template</strong>　生成項目とsequenceを参照するメッセージ書式。</td>
+<td>文字列。省略可。既定 &quot;entity={entity_id} status={status} value={value}&quot;。最長 6000</td>
+</tr>
+<tr>
+<td><code>Logs.tcp_framing</code></td>
+<td><strong>TCPのメッセージ境界</strong>　octet_countingはRFC6587の「UTF-8バイト数 空白 本文」。newlineは末尾改行。受信側と方式を合わせます。</td>
+<td>文字列。省略可。既定 &quot;octet_counting&quot;。選択肢 &quot;octet_counting&quot; / &quot;newline&quot;</td>
+</tr>
+<tr>
+<td><code>Logs.rotate_mb</code></td>
+<td><strong>Rotate Mb</strong>　ローカルファイルのローテーション容量MiB。</td>
+<td>整数。省略可。既定 10。最小 1。最大 100</td>
+</tr>
+<tr>
+<td><code>Logs.backups</code></td>
+<td><strong>Backups</strong>　ローテーションで残す過去ファイル数。</td>
+<td>整数。省略可。既定 5。最小 1。最大 30</td>
+</tr>
+<tr>
+<td><code>Logs.duplicate_every</code></td>
+<td><strong>Duplicate Every</strong>　指定件ごとに同じログを二重出力。</td>
+<td>整数。省略可。既定 0。最小 0</td>
+</tr>
+<tr>
+<td><code>Logs.malformed_every</code></td>
+<td><strong>Malformed Every</strong>　指定件ごとにヘッダーを壊し、収集側パーサーの隔離を試験。</td>
+<td>整数。省略可。既定 0。最小 0</td>
+</tr>
+</tbody>
+</table>
+<h3 id="異常を適用する条件-predicate">異常を適用する条件（Predicate）</h3>
+<table>
+<thead>
+<tr>
+<th>JSONキー</th>
+<th>画面名と用途</th>
+<th>型・入力条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Predicate.field</code></td>
+<td><strong>比較する先行項目</strong>　すでに生成された項目名。例: status。</td>
+<td>文字列。必須。書式 &quot;^[A-Za-z_][A-Za-z0-9_]{0,62}$&quot;</td>
+</tr>
+<tr>
+<td><code>Predicate.operator</code></td>
+<td><strong>比較方法</strong>　eq/neは一致・不一致、gt/ge/lt/leは大小比較、inは配列に含まれるかを判定します。大小比較では欠測値や比較できない型は不一致になります。inの比較値はJSON配列、または配列を参照する共有パラメーターを指定します。</td>
+<td>文字列。省略可。既定 &quot;eq&quot;。選択肢 &quot;eq&quot; / &quot;ne&quot; / &quot;gt&quot; / &quot;ge&quot; / &quot;lt&quot; / &quot;le&quot; / &quot;in&quot;</td>
+</tr>
+<tr>
+<td><code>Predicate.value</code></td>
+<td><strong>固定値 / 比較値 JSON</strong>　文字列は&quot;sample&quot;、数値は123、真偽値はtrue、空値はnull。&quot;$parameter&quot;で共有値を参照できます。</td>
+<td>JSON値。省略可。既定 null</td>
+</tr>
+</tbody>
+</table>
+<h3 id="modbusレジスタ-register">Modbusレジスター（Register）</h3>
+<table>
+<thead>
+<tr>
+<th>JSONキー</th>
+<th>画面名と用途</th>
+<th>型・入力条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Register.field</code></td>
+<td><strong>比較する先行項目</strong>　生成データの項目名。OPC UAノードやModbusレジスターへ対応付けます。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;value&quot;</td>
+</tr>
+<tr>
+<td><code>Register.area</code></td>
+<td><strong>Modbusの領域</strong>　holding=FC3、input=FC4、coil=FC1、discrete=FC2。アドレスは0始まりです。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;holding&quot;。選択肢 &quot;holding&quot; / &quot;input&quot; / &quot;coil&quot; / &quot;discrete&quot;</td>
+</tr>
+<tr>
+<td><code>Register.address</code></td>
+<td><strong>Address</strong>　0始まりのプロトコルアドレス。40001表記とは異なり、先頭のholding registerは0です。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 0。最小 0。最大 65535</td>
+</tr>
+<tr>
+<td><code>Register.encoding</code></td>
+<td><strong>レジスターの型</strong>　16bit整数は1レジスター、32bit/float32は2、float64は4。signedは負数対応。boolはcoil/discrete用。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;float32&quot;。選択肢 &quot;uint16&quot; / &quot;int16&quot; / &quot;uint32&quot; / &quot;int32&quot; / &quot;float32&quot; / &quot;float64&quot; / &quot;bool&quot;</td>
+</tr>
+<tr>
+<td><code>Register.byte_order</code></td>
+<td><strong>1ワード内のバイト順</strong>　bigは通常の上位バイト先頭、littleは16bitワード内のバイトを反転。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;big&quot;。選択肢 &quot;big&quot; / &quot;little&quot;</td>
+</tr>
+<tr>
+<td><code>Register.word_order</code></td>
+<td><strong>複数ワードの順序</strong>　bigは上位ワード先頭、littleは複数ワードを逆順にします。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;big&quot;。選択肢 &quot;big&quot; / &quot;little&quot;</td>
+</tr>
+<tr>
+<td><code>Register.scale</code></td>
+<td><strong>小数桁数 / 丸め桁数</strong>　レジスターへ入れる値=生成値×scale+offset。読取側は逆変換します。 <strong>このアプリでは適用外。</strong></td>
+<td>数値。省略可。既定 1</td>
+</tr>
+<tr>
+<td><code>Register.offset</code></td>
+<td><strong>Offset</strong>　倍率適用後に加える値。 <strong>このアプリでは適用外。</strong></td>
+<td>数値。省略可。既定 0</td>
+</tr>
+<tr>
+<td><code>Register.enum_values</code></td>
+<td><strong>Enum Values</strong>　文字列を数値へ変換する対応表。例: {&quot;ok&quot;:0,&quot;warning&quot;:1,&quot;stopped&quot;:2}。 <strong>このアプリでは適用外。</strong></td>
+<td>オブジェクト。省略可</td>
+</tr>
+</tbody>
+</table>
+<h3 id="コレクション-resource">コレクション（Resource）</h3>
+<table>
+<thead>
+<tr>
+<th>JSONキー</th>
+<th>画面名と用途</th>
+<th>型・入力条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Resource.name</code></td>
+<td><strong>表示名</strong>　コレクション名。REST/ODataのURLの末尾になります。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;orders&quot;。書式 &quot;^[A-Za-z_][A-Za-z0-9_]{0,62}$&quot;</td>
+</tr>
+<tr>
+<td><code>Resource.rows</code></td>
+<td><strong>生成レコード数</strong>　最初に用意する業務レコード数。 <strong>このアプリでは適用外。</strong></td>
+<td>整数。省略可。既定 200。最小 1。最大 1000000</td>
+</tr>
+<tr>
+<td><code>Resource.generator</code></td>
+<td><strong>任意項目とデータ異常</strong>　このコレクション専用の項目・生成条件。nullは共通データ定義を使用。 <strong>このアプリでは適用外。</strong></td>
+<td>データの生成条件（RunSpec） / null。省略可。既定 null</td>
+</tr>
+</tbody>
+</table>
+<h3 id="デ-タの生成条件-runspec">データの生成条件（RunSpec）</h3>
+<table>
+<thead>
+<tr>
+<th>JSONキー</th>
+<th>画面名と用途</th>
+<th>型・入力条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RunSpec.$schema</code></td>
+<td><strong>エディターのスキーマ参照</strong>　JSONエディターの補完に使うスキーマのファイルパスまたはURL。アプリは取得せず、保存済み設定にも含めません。 <strong>画面に表示されません。</strong></td>
+<td>文字列 / null。省略可。既定 null。最長 2048</td>
+</tr>
+<tr>
+<td><code>RunSpec._comment</code></td>
+<td><strong>エディター用のメモ</strong>　テンプレートに書ける編集者向けメモ。アプリの挙動を変えず、取込・保存・書き出しでは省かれます。 <strong>画面に表示されません。</strong></td>
+<td>文字列 / null。省略可。既定 null。最長 4000</td>
+</tr>
+<tr>
+<td><code>RunSpec.version</code></td>
+<td><strong>設定バージョン</strong>　このアプリはバージョン2のプリセットJSONを使用します。 <strong>画面に表示されません。</strong></td>
+<td>整数。省略可。既定 2。固定値 2</td>
+</tr>
+<tr>
+<td><code>RunSpec.name</code></td>
+<td><strong>表示名</strong>　一覧と実行履歴に表示する名前。業種や工場の種類を指定する必要はありません。 <strong>画面に表示されません。</strong></td>
+<td>文字列。省略可。既定 &quot;カスタムデータ&quot;。最短 1。最長 120</td>
+</tr>
+<tr>
+<td><code>RunSpec.description</code></td>
+<td><strong>用途・メモ</strong>　このプリセットの用途、変更した設定、実行前の条件を記録できます。選択欄にも表示します。接続先のパスワード等は記載せず、接続プロファイルへ保存してください。 <strong>画面に表示されません。</strong></td>
+<td>文字列。省略可。既定 &quot;&quot;。最長 1000</td>
+</tr>
+<tr>
+<td><code>RunSpec.connection_id</code></td>
+<td><strong>接続プロファイル</strong>　この実行に使用する保存済みの接続先。プリセットにはIDだけが入ります。認証情報は接続プロファイル側で管理します。 <strong>画面に表示されません。</strong></td>
+<td>文字列。省略可。既定 &quot;default&quot;。書式 &quot;^[A-Za-z0-9_-]{1,64}$&quot;</td>
+</tr>
+<tr>
+<td><code>RunSpec.connection_revision</code></td>
+<td><strong>接続リビジョン固定</strong>　通常はnull。実行開始時に接続設定の版を固定するので、実行中の接続先変更に影響されません。指定すると過去の版を使用します。 <strong>画面に表示されません。</strong></td>
+<td>整数 / null。省略可。既定 null。最小 1</td>
+</tr>
+<tr>
+<td><code>RunSpec.run_key</code></td>
+<td><strong>実行キー</strong>　再現性と重複判定の単位。英数字・ハイフン・下線。seedとシーケンスが同じなら同じrecord_idになります。別のデータ系列には別のキーを指定します。</td>
+<td>文字列。省略可。既定 &quot;trial-001&quot;。書式 &quot;^[A-Za-z0-9_-]{1,64}$&quot;</td>
+</tr>
+<tr>
+<td><code>RunSpec.seed</code></td>
+<td><strong>乱数シード</strong>　同じ実行キー・シード・シーケンス・項目名なら同じ値。0〜2147483647。</td>
+<td>整数。省略可。既定 42。最小 0。最大 2147483647</td>
+</tr>
+<tr>
+<td><code>RunSpec.rows</code></td>
+<td><strong>生成レコード数</strong>　1〜1億件。SQLは行数、ファイルはレコード数、ストリームはイベント数。画像は間引き設定により少なくなります。全件をメモリには保持しません。 <strong>画面に表示されません。</strong></td>
+<td>整数。省略可。既定 30。最小 1。最大 100000000</td>
+</tr>
+<tr>
+<td><code>RunSpec.target_rate</code></td>
+<td><strong>目標レコード数 / 秒</strong>　0は速度制限なし。バッチ単位で調整する目標値です。実際の速度はDB・ディスク・通信・生成条件で変わります。まず少量で測定してください。 <strong>画面に表示されません。</strong></td>
+<td>整数。省略可。既定 10。最小 0。最大 1000000</td>
+</tr>
+<tr>
+<td><code>RunSpec.batch_size</code></td>
+<td><strong>バッチ件数</strong>　1〜10000。SQLはトランザクション、ストリームは送信単位。ファイルはファイルあたり件数を使用。メモリ量やDBパラメーター上限に合わせて内部で縮小する場合があります。 <strong>画面に表示されません。</strong></td>
+<td>整数。省略可。既定 1000。最小 1。最大 10000</td>
+</tr>
+<tr>
+<td><code>RunSpec.start_sequence</code></td>
+<td><strong>開始シーケンス</strong>　0から始まる連番。途中から再開したり、分割した負荷試験に使用します。run_key / seedも合わせると同じデータを再現できます。</td>
+<td>整数。省略可。既定 0。最小 0。最大 1000000000</td>
+</tr>
+<tr>
+<td><code>RunSpec.max_duration_seconds</code></td>
+<td><strong>実行時間の上限 秒</strong>　この時間を超えると停止要求になります。進行中のDBトランザクションや通信の完了後に止まります。完了件数は履歴で確認できます。 <strong>画面に表示されません。</strong></td>
+<td>整数。省略可。既定 3600。最小 1。最大 86400</td>
+</tr>
+<tr>
+<td><code>RunSpec.max_output_mb</code></td>
+<td><strong>出力量の上限 MiB</strong>　ファイルとストリーム本文の論理上限。SQLのDB容量上限ではありません。サーバー側のメモリ・空き容量保護も常時有効です。 <strong>画面に表示されません。</strong></td>
+<td>整数。省略可。既定 1024。最小 1。最大 1048576</td>
+</tr>
+<tr>
+<td><code>RunSpec.initial_delay_seconds</code></td>
+<td><strong>開始前の待機 秒</strong>　実行開始後、生成を始めるまでの待機時間。複数のソースの開始時刻をずらせます。実行時間の上限にはこの待機も含まれます。 <strong>画面に表示されません。</strong></td>
+<td>数値。省略可。既定 0。最小 0。最大 3600</td>
+</tr>
+<tr>
+<td><code>RunSpec.jitter_ms</code></td>
+<td><strong>送信間隔のゆらぎ ms</strong>　速度調整の待機に0〜指定値の再現可能なゆらぎを加えます。目標速度が0の場合は適用しません。 <strong>画面に表示されません。</strong></td>
+<td>整数。省略可。既定 0。最小 0。最大 60000</td>
+</tr>
+<tr>
+<td><code>RunSpec.burst_rows</code></td>
+<td><strong>バーストのレコード数</strong>　0は通常送信。例: 1000にすると1000件単位でバースト間待機を適用。バッチはこの値以下に調整します。 <strong>画面に表示されません。</strong></td>
+<td>整数。省略可。既定 0。最小 0。最大 1000000</td>
+</tr>
+<tr>
+<td><code>RunSpec.burst_pause_ms</code></td>
+<td><strong>バースト間の待機 ms</strong>　バーストの境界で加える待機。目標速度の制限と両方が適用されます。 <strong>画面に表示されません。</strong></td>
+<td>整数。省略可。既定 0。最小 0。最大 3600000</td>
+</tr>
+<tr>
+<td><code>RunSpec.parameters</code></td>
+<td><strong>共有パラメーター JSON</strong>　任意のキーとJSON値。例: {&quot;count&quot;:100,&quot;states&quot;:[&quot;ok&quot;,&quot;ng&quot;]}。生成条件では$countや$statesで参照。テンプレートは{count}でも参照できます。</td>
+<td>オブジェクト。省略可</td>
+</tr>
+<tr>
+<td><code>RunSpec.fields</code></td>
+<td><strong>データ項目</strong>　上から順に生成します。項目名・型・生成器・詳細条件を自由に変更できます。他の項目を参照する場合は参照元を先に置きます。</td>
+<td>配列［項目と値の生成方法（FieldRule）］。省略可。最小件数 1。最大件数 100</td>
+</tr>
+<tr>
+<td><code>RunSpec.sql</code></td>
+<td><strong>SQL 書き込み設定</strong>　スキーマ・テーブル・操作を指定。データの列定義は共通のデータ項目から作成します。 <strong>画面に表示されません。</strong></td>
+<td>SQLの書き込み（SqlOptions）。省略可</td>
+</tr>
+<tr>
+<td><code>RunSpec.files</code></td>
+<td><strong>ファイル設定</strong>　形式・分割・命名・JSON構造・CSV仕様・画像条件を設定します。既存ファイルは上書きしません。 <strong>画面に表示されません。</strong></td>
+<td>ファイルの形式と完了通知（FileOptions）。省略可</td>
+</tr>
+<tr>
+<td><code>RunSpec.stream</code></td>
+<td><strong>ストリーム設定</strong>　メタデータの付加・本文形式・トピックを実行ごとに指定します。認証と配送方式は接続プロファイル側で管理します。 <strong>画面に表示されません。</strong></td>
+<td>本文と配送（StreamOptions）。省略可</td>
+</tr>
+<tr>
+<td><code>RunSpec.anomalies</code></td>
+<td><strong>データ異常の注入ルール</strong>　正常データを生成した後、指定した行位置・割合・条件で異常を注入します。複数ルールは上から順に適用。異常を含むプリセットは意図的にDB制約や受信検証で拒否される場合があります。</td>
+<td>配列［異常データの条件（AnomalyRule）］。省略可。最大件数 64</td>
+</tr>
+<tr>
+<td><code>RunSpec.faults</code></td>
+<td><strong>処理障害・不正ファイルのシミュレーション</strong>　この実行だけに障害を注入します。外部のサーバーやネットワーク設定は変更しません。SQLのロールバック、ファイル未完了、配送ACK消失、遅延等を再現できます。 <strong>画面に表示されません。</strong></td>
+<td>実行処理の障害（FaultOptions）。省略可</td>
+</tr>
+<tr>
+<td><code>RunSpec.task</code></td>
+<td><strong>実行タスク</strong>　通常はgenerate。未配送の再送は履歴画面の操作から起動します。 <strong>画面に表示されません。</strong></td>
+<td>文字列。省略可。既定 &quot;generate&quot;。選択肢 &quot;generate&quot; / &quot;retry&quot;</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sqlの書き込み-sqloptions">SQLの書き込み（SqlOptions）</h3>
+<table>
+<thead>
+<tr>
+<th>JSONキー</th>
+<th>画面名と用途</th>
+<th>型・入力条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SqlOptions.schema_name</code></td>
+<td><strong>スキーマ / 所有者</strong>　空欄はDBユーザーの既定スキーマ。SQL Serverは例: synthetic、Oracleは所有者名、PostgreSQLはpublic。MySQL / SQLiteでは通常空欄。スキーマ自体は自動作成しません。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;&quot;。書式 &quot;^$|^[A-Za-z_][A-Za-z0-9_]{0,62}$&quot;</td>
+</tr>
+<tr>
+<td><code>SqlOptions.table</code></td>
+<td><strong>テーブル名</strong>　英数字と下線の識別子。既存テーブルを選ぶ場合、生成項目と列名・型を合わせます。未作成ならDDLを確認して作成できます。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;sample_records&quot;。書式 &quot;^[A-Za-z_][A-Za-z0-9_]{0,62}$&quot;</td>
+</tr>
+<tr>
+<td><code>SqlOptions.operation</code></td>
+<td><strong>SQL 操作</strong>　insert=追加のみ、upsert=主キーで追加/更新、update=既存行更新、delete=主キー一致行削除。DDLやDROPは実行しません。同時に同じ主キーへ書く別アプリがある場合は競合し得ます。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;upsert&quot;。選択肢 &quot;insert&quot; / &quot;upsert&quot; / &quot;update&quot; / &quot;delete&quot;</td>
+</tr>
+</tbody>
+</table>
+<h3 id="本文と配送-streamoptions">本文と配送（StreamOptions）</h3>
+<table>
+<thead>
+<tr>
+<th>JSONキー</th>
+<th>画面名と用途</th>
+<th>型・入力条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>StreamOptions.envelope</code></td>
+<td><strong>配送メタデータを追加</strong>　JSONオブジェクトにrecord_key / run_key / sequenceを追加。重複排除や追跡に推奨。本文が配列やスカラーの場合は無効にします。 <strong>このアプリでは適用外。</strong></td>
+<td>真偽値。省略可。既定 true</td>
+</tr>
+<tr>
+<td><code>StreamOptions.metadata_key</code></td>
+<td><strong>メタデータの項目名</strong>　既定は_source。生成項目や本文テンプレートのキーと重複させないでください。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;<em>source&quot;。書式 &quot;^[A-Za-z</em>][A-Za-z0-9_]{0,62}$&quot;</td>
+</tr>
+<tr>
+<td><code>StreamOptions.http_body</code></td>
+<td><strong>HTTP 本文単位</strong>　array=バッチをJSON配列、single=1件ずつ、ndjson=改行区切りJSON。MQTTは常に1イベント1メッセージです。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;array&quot;。選択肢 &quot;array&quot; / &quot;single&quot; / &quot;ndjson&quot;</td>
+</tr>
+<tr>
+<td><code>StreamOptions.topic_template</code></td>
+<td><strong>配送先名のテンプレート</strong>　空欄は接続プロファイルの配送先名。MQTT / Kafka / NATS / AMQPのトピック・subject・routing keyを項目ごとに変えられます。例: data.{entity_id}。各プロトコルの命名規則に合わせます。 <strong>このアプリでは適用外。</strong></td>
+<td>文字列。省略可。既定 &quot;&quot;。最長 512</td>
+</tr>
+<tr>
+<td><code>StreamOptions.payload_template</code></td>
+<td><strong>送信本文のJSON構造</strong>　nullなら生成行。例: {&quot;device&quot;:&quot;$row.entity_id&quot;,&quot;values&quot;:[&quot;$row.value&quot;],&quot;source&quot;:&quot;$parameters.site&quot;}。配列やスカラーならメタデータ追加を無効にします。 <strong>このアプリでは適用外。</strong></td>
+<td>JSON値。省略可。既定 null</td>
+</tr>
+<tr>
+<td><code>StreamOptions.delivery_attempts</code></td>
+<td><strong>1バッチの送信試行数</strong>　1〜10回。失敗したバッチは永続outboxに残ります。受信済みでも応答が失われた場合は重複し得るためrecord_keyを使います。 <strong>このアプリでは適用外。</strong></td>
+<td>整数 / null。省略可。既定 null。最小 1。最大 10</td>
+</tr>
+<tr>
+<td><code>StreamOptions.retry_backoff_ms</code></td>
+<td><strong>再試行の基準待機 ms</strong>　同一バッチの再試行間隔。試行ごとに2倍、最大60秒。0は待機なし。 <strong>このアプリでは適用外。</strong></td>
+<td>整数 / null。省略可。既定 null。最小 0。最大 60000</td>
+</tr>
+</tbody>
+</table>
+<h2 id="公開-出力設定">公開・出力設定</h2>
+<table>
+<thead>
+<tr>
+<th>JSONキー</th>
+<th>画面名と用途</th>
+<th>型・入力条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td><strong>接続ID</strong>　保存用ID。同じIDで保存すると新しい版になります。</td>
+<td>文字列。省略可。既定 &quot;default&quot;。書式 &quot;^[A-Za-z0-9_-]{1,64}$&quot;</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><strong>表示名</strong>　公開先・認証・配送先を管理するプロファイルの表示名。</td>
+<td>文字列。省略可。既定 &quot;既定の公開設定&quot;。最長 120</td>
+</tr>
+<tr>
+<td><code>auth_mode</code></td>
+<td><strong>取得APIの認証方式</strong>　noneは取得用APIの認証なし、basicはユーザーとパスワード、bearerはAuthorization: Bearer、api_keyはX-API-Key。管理画面の認証は別に設定します。</td>
+<td>文字列。省略可。既定 &quot;none&quot;。選択肢 &quot;none&quot; / &quot;basic&quot; / &quot;bearer&quot; / &quot;api_key&quot;</td>
+</tr>
+<tr>
+<td><code>username</code></td>
+<td><strong>ユーザー名</strong>　データ取得API専用のBasic認証ユーザー。管理画面の認証は別に設定します。</td>
+<td>文字列。省略可。既定 &quot;source&quot;。最長 120</td>
+</tr>
+<tr>
+<td><code>password</code></td>
+<td><strong>パスワード</strong>　取得APIのBasic認証パスワード。空欄は同じ認証方式の保存値を維持。暗号化保存し、読み戻しません。 <strong>秘密値。</strong></td>
+<td>文字列 / null。省略可。既定 null</td>
+</tr>
+<tr>
+<td><code>token</code></td>
+<td><strong>Token</strong>　BearerまたはX-API-Keyで受け付ける値。値は暗号化保存し、JSON書き出しには含めません。 <strong>秘密値。</strong></td>
+<td>文字列 / null。省略可。既定 null</td>
+</tr>
+<tr>
+<td><code>allow_writes</code></td>
+<td><strong>Allow Writes</strong>　取得APIのPOST/PATCH/DELETEを許可。既定は読み取りのみ。操作するのはこのツールの疑似データです。 <strong>画面に表示されません。</strong></td>
+<td>真偽値。省略可。既定 false</td>
+</tr>
+<tr>
+<td><code>opc_enabled</code></td>
+<td><strong>Opc Enabled</strong>　OPC UAのバイナリーサーバーを公開します。HTTP送信とは異なり、収集側から読まれたり購読されたりする方式です。 <strong>画面に表示されません。</strong></td>
+<td>真偽値。省略可。既定 true</td>
+</tr>
+<tr>
+<td><code>opc_port</code></td>
+<td><strong>Opc Port</strong>　コンテナ内のOPC UA待受ポート。ホストへの公開ポートはComposeで設定します。 <strong>画面に表示されません。</strong></td>
+<td>整数。省略可。既定 4840。最小 1024。最大 65535</td>
+</tr>
+<tr>
+<td><code>namespace_uri</code></td>
+<td><strong>Namespace Uri</strong>　NodeIdを識別する名前空間URI。クライアントはnamespace URIからindexを取得してください。 <strong>画面に表示されません。</strong></td>
+<td>文字列。省略可。既定 &quot;urn:factory:equipment:simulator&quot;。最長 255</td>
+</tr>
+<tr>
+<td><code>opc_auth</code></td>
+<td><strong>OPC UAの認証</strong>　anonymousは匿名読取、usernameは専用ユーザーで認証。username時はSignAndEncryptが必要です。 <strong>画面に表示されません。</strong></td>
+<td>文字列。省略可。既定 &quot;anonymous&quot;。選択肢 &quot;anonymous&quot; / &quot;username&quot;</td>
+</tr>
+<tr>
+<td><code>opc_username</code></td>
+<td><strong>Opc Username</strong>　OPC UAのユーザー名認証で使用するユーザー。 <strong>画面に表示されません。</strong></td>
+<td>文字列。省略可。既定 &quot;reader&quot;。最長 120</td>
+</tr>
+<tr>
+<td><code>opc_password</code></td>
+<td><strong>Opc Password</strong>　OPC UAユーザーのパスワード。ユーザー名認証時はSignAndEncryptを必須にします。 <strong>画面に表示されません。</strong></td>
+<td>文字列 / null。省略可。既定 null</td>
+</tr>
+<tr>
+<td><code>opc_security</code></td>
+<td><strong>OPC UAの通信保護</strong>　noneは署名・暗号化なし。sign_encryptはBasic256Sha256で署名と暗号化。証明書と秘密鍵を配置し、クライアントも対応する証明書で接続します。 <strong>画面に表示されません。</strong></td>
+<td>文字列。省略可。既定 &quot;none&quot;。選択肢 &quot;none&quot; / &quot;sign_encrypt&quot;</td>
+</tr>
+<tr>
+<td><code>certificate_file</code></td>
+<td><strong>Certificate File</strong>　connection-files内のサーバー証明書。OPC UAはapplication URI入りのDER/PEM証明書を使用します。 <strong>画面に表示されません。</strong></td>
+<td>文字列。省略可。既定 &quot;&quot;</td>
+</tr>
+<tr>
+<td><code>private_key_file</code></td>
+<td><strong>Private Key File</strong>　connection-files内のサーバー秘密鍵。ファイルは権限600で保存します。 <strong>画面に表示されません。</strong></td>
+<td>文字列。省略可。既定 &quot;&quot;</td>
+</tr>
+<tr>
+<td><code>trusted_client_certificates</code></td>
+<td><strong>Trusted Client Certificates</strong>　SignAndEncryptで信頼するクライアントのleaf証明書。connection-files内のDER/PEMパスを配列で指定。指紋と有効期間を検証します。 <strong>画面に表示されません。</strong></td>
+<td>配列［文字列］。省略可。最大件数 100</td>
+</tr>
+<tr>
+<td><code>modbus_enabled</code></td>
+<td><strong>Modbus Enabled</strong>　Modbus TCPサーバーを公開。TCPにはユーザー名・パスワード認証はありません。接続元制限はホストで行います。 <strong>画面に表示されません。</strong></td>
+<td>真偽値。省略可。既定 true</td>
+</tr>
+<tr>
+<td><code>modbus_port</code></td>
+<td><strong>Modbus Port</strong>　コンテナ内のModbus TCP待受。非特権ユーザーのため既定は1502です。 <strong>画面に表示されません。</strong></td>
+<td>整数。省略可。既定 1502。最小 1024。最大 65535</td>
+</tr>
+<tr>
+<td><code>output</code></td>
+<td><strong>送信・保存方式</strong>　captureは永続記録だけ、fileはローカル回転ログ、udp/tcp/tlsはSyslog。UDP/TCPは受信アプリの処理完了を保証しません。MQTTはQoS1のブローカーACK、HTTPは2xx受付まで。</td>
+<td>文字列。省略可。既定 &quot;capture&quot;。選択肢 &quot;capture&quot; / &quot;file&quot; / &quot;udp&quot; / &quot;tcp&quot; / &quot;tls&quot;</td>
+</tr>
+<tr>
+<td><code>host</code></td>
+<td><strong>ホスト</strong>　Syslog/MQTT送信先のホスト。http://やポートは含めません。</td>
+<td>文字列。省略可。既定 &quot;&quot;。最長 255</td>
+</tr>
+<tr>
+<td><code>port</code></td>
+<td><strong>ポート</strong>　送信先ポート。未指定はSyslog514/TLS6514、MQTT1883/TLS8883を使用。</td>
+<td>整数 / null。省略可。既定 null。最小 1。最大 65535</td>
+</tr>
+<tr>
+<td><code>topic</code></td>
+<td><strong>配送先トピック / subject / routing key</strong>　RFID・バーコードイベントをMQTTで配信するトピック。 <strong>画面に表示されません。</strong></td>
+<td>文字列。省略可。既定 &quot;factory/identification&quot;。最長 255</td>
+</tr>
+<tr>
+<td><code>url</code></td>
+<td><strong>送信URL</strong>　HTTP送信先URL。HTTP APIへ1イベントずつJSONをPOSTします。 <strong>画面に表示されません。</strong></td>
+<td>文字列。省略可。既定 &quot;&quot;。最長 2048</td>
+</tr>
+<tr>
+<td><code>output_username</code></td>
+<td><strong>Output Username</strong>　MQTT送信用のユーザー。取得APIの認証とは別です。 <strong>画面に表示されません。</strong></td>
+<td>文字列。省略可。既定 &quot;&quot;。最長 255</td>
+</tr>
+<tr>
+<td><code>mqtt_tls</code></td>
+<td><strong>Mqtt Tls</strong>　MQTT接続でTLSを使用。既定ポートは有効時8883、無効時1883。CAと検証設定も適用します。 <strong>画面に表示されません。</strong></td>
+<td>真偽値。省略可。既定 false</td>
+</tr>
+<tr>
+<td><code>output_password</code></td>
+<td><strong>Output Password</strong>　MQTT送信先パスワード。暗号化して保存します。 <strong>画面に表示されません。</strong></td>
+<td>文字列 / null。省略可。既定 null</td>
+</tr>
+<tr>
+<td><code>output_token</code></td>
+<td><strong>Output Token</strong>　HTTP送信時のBearerトークン。空欄なら認証ヘッダーを付けません。 <strong>画面に表示されません。</strong></td>
+<td>文字列 / null。省略可。既定 null</td>
+</tr>
+<tr>
+<td><code>tls_verify</code></td>
+<td><strong>Tls Verify</strong>　送信先のTLS証明書とホスト名を検証。Syslog TLS / HTTPS / MQTT TLSに適用します。</td>
+<td>真偽値。省略可。既定 true</td>
+</tr>
+<tr>
+<td><code>ca_file</code></td>
+<td><strong>Ca File</strong>　送信先CA証明書。connection-files内のPEM。未指定はシステム信頼ストア。</td>
+<td>文字列。省略可。既定 &quot;&quot;</td>
+</tr>
+<tr>
+<td><code>timeout_seconds</code></td>
+<td><strong>接続・通信タイムアウト 秒</strong>　接続・受信ACKの最大待機秒数。</td>
+<td>整数。省略可。既定 10。最小 1。最大 60</td>
+</tr>
+<tr>
+<td><code>clear_secrets</code></td>
+<td><strong>削除する保存済み認証情報 JSON</strong>　明示的に消す秘密情報名の配列。例: [&quot;token&quot;]。空欄による維持と区別します。</td>
+<td>配列［文字列］。省略可</td>
+</tr>
+</tbody>
+</table>
+</article>
+    </main>
+  </div>
+</body>
+</html>

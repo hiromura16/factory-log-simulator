@@ -10,7 +10,9 @@ import threading
 import time
 from pathlib import Path
 from models import Spec
-from generation import generate_record, validate_generation
+from api_support import display_location, history_error
+from generation import GenerationError, generate_record
+from validation import validate_source_spec
 
 
 class Controller:
@@ -43,6 +45,7 @@ class Controller:
                 "produced": self.produced,
                 "requests": self.requests,
                 "error": self.error,
+                "error_message": history_error(self.error),
                 "dataset_id": self.ds,
                 "recent": list(self.recent)[-30:],
                 "elapsed_seconds": round(time.time() - self.started, 2)
@@ -62,14 +65,7 @@ class Controller:
         with self.lock:
             if self.thread and self.thread.is_alive():
                 raise RuntimeError("実行中です。設定変更前に停止してください")
-            validate_generation(spec.generator)
-            if (
-                self.kind == "equipment"
-                and spec.equipment.devices * len(spec.generator.fields) > 5000
-            ):
-                raise ValueError(
-                    "1実行の設備ノードは5000項目以下にしてください"
-                )
+            validate_source_spec(self.kind, spec)
             profile, revision = self.store.profile(spec.profile_id, revision)
             if profile.auth_mode == "basic" and not profile.password:
                 raise ValueError("取得APIのBasic認証パスワードが必要です")
@@ -136,20 +132,18 @@ class Controller:
 
         スレッドが残る場合はstoppingとし、停止完了を装わない。
         """
-        self.stop_event.set()
-        self.store.meta(
-            "desired",
-            {
-                "running": False,
-                "spec": self.spec.model_dump(mode="json")
-                if self.spec
-                else None,
-            },
-        )
-        if self.thread:
-            self.thread.join(timeout=15)
-        if self.thread and self.thread.is_alive():
-            self.status = "stopping"
+        with self.lock:
+            self.stop_event.set()
+            desired = self.store.meta("desired")
+            if desired:
+                # 停止を繰り返しても、前回の公開設定と版を保持する。
+                self.store.meta("desired", {**desired, "running": False})
+            thread = self.thread
+        if thread:
+            thread.join(timeout=15)
+            with self.lock:
+                if self.thread is thread and thread.is_alive():
+                    self.status = "stopping"
         return self.snapshot()
 
     def guard(self):
@@ -161,7 +155,7 @@ class Controller:
             raise RuntimeError("disk_space_low")
         for line in Path("/proc/meminfo").read_text().splitlines():
             if line.startswith("MemAvailable:") and int(line.split()[1]) < int(
-                float(os.environ.get("MIN_AVAILABLE_GIB", "6")) * 1024**2
+                float(os.environ.get("MIN_AVAILABLE_GIB", "1")) * 1024**2
             ):
                 raise RuntimeError("host_memory_headroom_low")
         if (
@@ -209,14 +203,8 @@ class Controller:
             self.status = "stopped"
         except Exception as exc:
             self.error = (
-                str(exc)
-                if isinstance(exc, ValueError)
-                or str(exc)
-                in {
-                    "disk_space_low",
-                    "host_memory_headroom_low",
-                    "storage_limit",
-                }
+                f"generation_error: {display_location(exc.path)}　{exc}" if isinstance(exc, GenerationError)
+                else str(exc) if str(exc) in {"disk_space_low", "host_memory_headroom_low", "storage_limit"}
                 else type(exc).__name__
             )
             self.status = "failed"
@@ -226,6 +214,31 @@ class Controller:
                     await self.driver.close()
                 except Exception:
                     pass
+
+    def source_profile(self):
+        """生成を再開せず、保存済みデータの取得用プロフィールを選ぶ。"""
+        if self.profile is not None:
+            return self.profile
+        desired = self.store.meta("desired")
+        saved = desired.get("spec") if desired else None
+        if saved is None:
+            with self.store.db() as db:
+                if db.execute("SELECT 1 FROM events LIMIT 1").fetchone():
+                    raise KeyError("missing saved source profile")
+            return self.store.profile()[0]
+        if not isinstance(saved, dict):
+            raise KeyError("invalid source configuration")
+        identity = saved.get("profile_id")
+        revision = desired.get("revision")
+        if not isinstance(identity, str) or not identity:
+            raise KeyError("invalid source profile")
+        if revision is not None and (type(revision) is not int or revision < 1):
+            raise KeyError("invalid source profile revision")
+        profile, stored_revision = self.store.profile(identity, revision)
+        # 旧版の停止記録には版がない。版が1つと分かる場合だけ照合する。
+        if revision is None and stored_revision != 1:
+            raise KeyError("ambiguous source profile revision")
+        return profile
 
     def source_spec(self):
         """現在の設定、保存された希望設定、既定設定の順で取得する。"""
