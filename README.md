@@ -1,6 +1,6 @@
 # ログ発生器 / 回転ファイル・Syslog
 
-[プリセット一覧](presets/README.md) · [Dokploy配備手順](docs/dokploy-deploy.md) · [コード読解ガイド](docs/code-reading-guide.md)
+[プリセット一覧](presets/README.md) · [アプリ別マニュアル](docs/user-manual.md) · [VMへのDocker Compose導入手順](docs/vm-compose.md) · [コード読解ガイド](docs/code-reading-guide.md)
 
 設備・MES・アプリケーションの疑似ログを作成し、収集・パース・再送を試験します。
 
@@ -54,10 +54,10 @@ docker compose up -d --build
 `.env`のAPP_PORTが画面のポート、BIND_IPは既定127.0.0.1。管理画面と操作APIはログイン不要です。直接起動する場合:
 
 ```sh
-DATA_DIR="$PWD/data" AUTO_START=1 uv run uvicorn app:app --host 127.0.0.1 --port 8080 --workers 1
+DATA_DIR="$PWD/data" uv run uvicorn app:app --host 127.0.0.1 --port 8080 --workers 1
 ```
 
-1アプリ1プロセス・1実行。AUTO_START=1は初回に既定プリセットを開始。その後は保存済みの停止・実行状態を復元します。Docker再作成後もnamed volumeへ設定・データを保持。初期設定は小規模で、速度は保証値ではありません。interval_ms、batch_size、タグ/設備/件数等を増やす場合も、CPU・メモリ・容量上限を合わせて設定してください。
+1アプリ1プロセス・1実行。起動後は停止状態で、画面または操作APIからの開始を待ちます。Docker再作成後もnamed volumeへ設定・データを保持。初期設定は小規模で、速度は保証値ではありません。interval_ms、batch_size、タグ/設備/件数等を増やす場合も、CPU・メモリ・容量上限を合わせて設定してください。
 
 ## 認証・データと運用
 

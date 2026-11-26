@@ -232,19 +232,8 @@ def create_app(kind):
 
     @asynccontextmanager
     async def lifespan(app):
-        """保存した希望状態に従って再開し、終了時は希望状態を変更せずスレッドを止める。"""
-        desired = store.meta("desired")
-        if desired and desired.get("running") and desired.get("spec"):
-            controller.start(
-                Spec.model_validate(desired["spec"]), desired.get("revision")
-            )
-        elif desired is None and os.environ.get("AUTO_START") == "1":
-            defaults = next(iter(store.presets()), None)
-            controller.start(
-                Spec.model_validate(defaults["spec"]) if defaults else Spec()
-            )
+        """操作を待ち、終了時は実行スレッドを止めて保存済み設定を保持する。"""
         yield
-        # 終了時には利用者が指定した実行・停止の希望状態を変更せず保持する。
         controller.stop_event.set()
         if controller.thread:
             await __import__("asyncio").to_thread(controller.thread.join, 15)

@@ -34,7 +34,6 @@
       "environment": {
         "DATA_DIR": "/data",
         "MIN_AVAILABLE_GIB": "${MIN_AVAILABLE_GIB:-6}",
-        "AUTO_START": "${AUTO_START:-1}",
         "LOG_DIR": "/logs"
       },
       "volumes": [
