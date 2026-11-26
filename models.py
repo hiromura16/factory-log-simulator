@@ -1,21 +1,22 @@
-"""各模擬ソースの設定と公開・認証プロファイルを定義する。
-
-クラスコメントは開発者向けであり、公開スキーマの説明や既定値を変更しない。
-"""
+"""設備・データ取得・イベントの公開と生成条件を定義する。"""
 
 from __future__ import annotations
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
-from config import RunSpec
+from config import ConfigurationError, RunSpec, TemplateAnnotations
 
 
 # 未知の設定項目を拒否するアプリ共通入力モデル。
 class Model(BaseModel):
+    """未知の設定項目と非有限数を拒否する。"""
+
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
 # 取得API認証、設備公開条件とイベント送信先をまとめる。
 class Profile(Model):
+    """取得時の認証、設備の公開条件、イベントの送信先を指定する。"""
+
     id: str = Field(
         default="default",
         pattern=r"^[A-Za-z0-9_-]{1,64}$",
@@ -30,7 +31,7 @@ class Profile(Model):
     username: str = Field(
         default="source",
         max_length=120,
-        description="データ取得API専用のBasic認証ユーザー。管理画面はログイン不要です。",
+        description="データ取得API専用のBasic認証ユーザー。管理画面の認証は別に設定します。",
     )
     password: SecretStr | None = Field(
         default=None,
@@ -153,6 +154,8 @@ class Profile(Model):
 
 # 生成項目とModbus領域・アドレス・型変換を対応付ける。
 class Register(Model):
+    """生成項目をModbusアドレスとデータ型へマッピングする。"""
+
     field: str = Field(
         default="value",
         description="生成データの項目名。OPC UAノードやModbusレジスターへ対応付けます。",
@@ -182,6 +185,8 @@ class Register(Model):
 
 # 設備数、公開値、レジスター対応と通信・品質異常を定義する。
 class Equipment(Model):
+    """OPC UA／Modbusへ公開する装置の台数と挙動を定義する。"""
+
     devices: int = Field(
         default=4,
         ge=1,
@@ -246,10 +251,10 @@ class Equipment(Model):
                 r.encoding, 1
             )
             if r.area in {"coil", "discrete"} and r.encoding != "bool":
-                raise ValueError("coil/discreteの型はboolです")
+                raise ConfigurationError("coil/discreteの型はboolです")
             for address in range(r.address, r.address + width):
                 if address > 65535 or (r.area, address) in used:
-                    raise ValueError(
+                    raise ConfigurationError(
                         "レジスターのアドレス幅が重複・範囲外です"
                     )
                 used.add((r.area, address))
@@ -258,6 +263,8 @@ class Equipment(Model):
 
 # 業務コレクション名、初期件数と専用の生成条件を定義する。
 class Resource(Model):
+    """業務APIで公開する1コレクションの名前、件数、項目定義を保持する。"""
+
     name: str = Field(
         default="orders",
         pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,62}$",
@@ -277,6 +284,8 @@ class Resource(Model):
 
 # 業務レコードの更新、ページ取得とHTTP障害模擬を設定する。
 class Business(Model):
+    """ページ取得、差分更新、異常応答の試験条件を定義する。"""
+
     resources: list[Resource] = Field(
         default_factory=lambda: [Resource()],
         min_length=1,
@@ -329,6 +338,8 @@ class Business(Model):
 
 # 時系列タグ、サンプル間隔、品質・欠測と保持期間を設定する。
 class History(Model):
+    """保存する履歴タグと時刻、品質、保存期間を指定する。"""
+
     tags: list[str] = Field(
         default_factory=lambda: ["value"],
         min_length=1,
@@ -383,6 +394,8 @@ class History(Model):
 
 # ログの書式、回転、重複と破損の模擬条件を定義する。
 class Logs(Model):
+    """ログ本文・書式・ローテーション・配送障害の設定を保持する。"""
+
     format: Literal["jsonl", "plain", "rfc5424", "rfc3164"] = "rfc5424"
     facility: int = Field(
         default=16,
@@ -436,6 +449,8 @@ class Logs(Model):
 
 # タグ・読取機・作業者と識別イベント異常を定義する。
 class Identification(Model):
+    """識別イベントとラベルを生成する条件を定義する。"""
+
     tags: int = Field(
         default=100,
         ge=1,
@@ -481,7 +496,9 @@ class Identification(Model):
 
 
 # 共通生成設定と各ソース固有の条件、実行周期・資源上限を束ねる。
-class Spec(Model):
+class Spec(TemplateAnnotations):
+    """1回の模擬ソース実行に使う生成条件と公開設定の参照を保持する。"""
+
     version: Literal[1] = 1
     name: str = Field(
         default="小さく試す",
@@ -538,14 +555,14 @@ class Spec(Model):
         if len({r.name for r in self.business.resources}) != len(
             self.business.resources
         ):
-            raise ValueError("コレクション名は重複できません")
+            raise ConfigurationError("コレクション名は重複できません")
         if (
             self.history.initial_samples
             * self.history.devices
             * len(self.history.tags)
             > 2000000
         ):
-            raise ValueError("初期履歴は合計200万点以下にしてください")
+            raise ConfigurationError("初期履歴は合計200万点以下にしてください")
         return self
 
 

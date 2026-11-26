@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>初めて使う | ログシミュレーター</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/help.css">
+  <script src="/static/help.js" defer></script>
+</head>
+<body class="help-page">
+  <a class="help-skip" href="#help-content">本文へ移動</a>
+  <div class="help-top">
+    <a class="help-home" href="/">ログシミュレーター</a>
+    <a href="/">アプリに戻る</a>
+  </div>
+  <div class="help-layout">
+    <nav class="help-nav" aria-label="ヘルプ"><a href="/help/index.html" aria-current="page">初めて使う</a><a href="/help/presets.html">ひな型を選ぶ・作る</a><a href="/help/templates.html">JSONの書き方</a><a href="/help/settings.html">設定リファレンス</a><a href="/help/api.html">APIの使い方</a><a href="/help/glossary.html">用語集</a><a href="/help/ai.html">AIにひな型を頼む</a><a href="/help/install.html">VMへの導入</a><a href="/help/catalog.html">付属のひな型一覧</a></nav>
+    <main class="help-content" id="help-content">
+      <nav class="help-outline" aria-label="このページ"><a href="#最初に試すこと">最初に試すこと</a><a href="#よくある質問">よくある質問</a><a href="#停止と再起動">停止と再起動</a><a href="#想定した結果が出ないとき">想定した結果が出ないとき</a><a href="#見本に表示される時刻">見本に表示される時刻</a><a href="#次に読む">次に読む</a></nav>
+      <article><h1>ログシミュレーター 操作マニュアル</h1>
+<p>疑似のアプリ・設備ログを使い、パーサー、ログ転送、ローテーション、再試行を検証します。指定書式で本文を整形し、capture・ファイル・Syslogのいずれかへ出力します。</p>
+<h2 id="最初に試すこと">最初に試すこと</h2>
+<p><strong>疑似ログをcaptureに記録して本文を読む</strong>。生成したメッセージを取得APIで確認できます。captureを選ぶと外部Syslogへ送らずに試せます。</p>
+<p><a href="/help/install.html">Docker Compose導入手順</a>で準備し、VMで <code>http://127.0.0.1:3643/</code> を開きます。</p>
+<p>captureはアプリ内への記録です。Syslogはログを外部へ送る方式です。最初にcaptureを選び、時刻、重要度、本文が収集先で読める形式になっているかを切り分けます。</p>
+<ol>
+<li>「正常 / ローカル回転ログ / RFC5424」を読み込みます。「公開・出力設定」でcaptureを選びます。</li>
+<li>「ログの見本を見る」で本文とUTF-8のバイト数を確認します。RFC5424はSyslogの書式で、送信プロトコルとは別に選びます。</li>
+<li>「ログ出力を開始」を押し、少し記録されたら「実行状況・取得方法」で停止します。</li>
+<li>同じアドレスの <code>/source/logs/download?limit=10</code> で本文、<code>/source/events?limit=10</code> でイベントの状態を確認します。</li>
+</ol>
+<p><a href="/help/images/operation-guide.png"><img src="/help/images/operation-guide.png" alt="最初の操作と確認箇所" loading="lazy" /></a></p>
+<h2 id="よくある質問">よくある質問</h2>
+<h3 id="ログが止まらず増えるのが心配です">ログが止まらず増えるのが心配です</h3>
+<p>実行状況で停止すると新しい疑似ログは増えません。小さく試す場合は詳細設定で最大tick数も決めてから開始します。</p>
+<h3 id="ファイルとcaptureの違いは">ファイルとcaptureの違いは？</h3>
+<p>captureは取得APIから読めるアプリ内記録です。fileはVMの <code>LOG_DIR</code> 側に回転ログを書き出す方式です。</p>
+<h3 id="tcp-tlsで受信側が複数行をまとめてしまいます">TCP/TLSで受信側が複数行をまとめてしまいます</h3>
+<p>改行区切りかバイト数を付ける区切りかを、送信設定と受信側で揃えます。</p>
+<h2 id="停止と再起動">停止と再起動</h2>
+<p>「実行状況・取得方法」で停止します。VMやコンテナを再起動しても手動開始まで疑似ログは増えません。Docker自身のサービスログは疑似ログとは別で、Composeでサイズと世代数を制限しています。</p>
+<h2 id="想定した結果が出ないとき">想定した結果が出ないとき</h2>
+<p>ファイルが増えない場合は出力プロファイル、ホストの <code>LOG_DIR</code>、コンテナUID 1000の書き込み権限を確認します。外部送信の不達は配送状態と受信側ログを照合します。</p>
+<h2 id="見本に表示される時刻">見本に表示される時刻</h2>
+<p>見本は書式を比較しやすいように固定した時刻を使います。実行した記録の時刻は、設定された日時ルールや実行時の記録から確認します。ログ本文の <code>message_template</code> が参照する項目は、生成項目に名前を揃えて定義します。</p>
+<h2 id="次に読む">次に読む</h2>
+<ul>
+<li><a href="/help/presets.html">ひな型を選ぶ・作る</a></li>
+<li><a href="/help/settings.html">設定リファレンス</a></li>
+<li><a href="/help/templates.html">JSONの書き方</a></li>
+<li><a href="/help/api.html">APIの使い方</a></li>
+<li><a href="/help/glossary.html">用語集</a></li>
+</ul>
+</article>
+    </main>
+  </div>
+</body>
+</html>

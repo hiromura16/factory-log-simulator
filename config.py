@@ -1,7 +1,4 @@
-"""共通データ生成と接続設定の入力契約を定義する。
-
-モデルの説明は生成JSON Schemaへ波及するため、クラスの解説はコメントに置く。
-"""
+"""Pydanticで接続先とデータ生成の入力を検証し、JSON Schemaを公開する。"""
 
 from __future__ import annotations
 
@@ -52,12 +49,45 @@ ALLOWED_KINDS = {
 
 
 # 余分な入力項目と非有限数を拒否する共通の入力モデル。
+class ConfigurationError(ValueError):
+    """設定を直すための、入力値を含まない利用者向けメッセージ。"""
+
+
 class Model(BaseModel):
+    """設定の未知キーと非有限数を拒否する。"""
+
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+
+class TemplateAnnotations(Model):
+    """エディター用の注釈を受け取る。生成・保存・書き出しには使用しない。"""
+
+    editor_schema: str | None = Field(
+        default=None,
+        alias="$schema",
+        max_length=2048,
+        exclude=True,
+        repr=False,
+        title="エディターのスキーマ参照",
+        description="JSONエディターの補完に使うスキーマのファイルパスまたはURL。アプリは取得せず、保存済み設定にも含めません。",
+        json_schema_extra={"ui_hidden": True, "x-editor-only": True},
+    )
+    editor_comment: str | None = Field(
+        default=None,
+        alias="_comment",
+        max_length=4000,
+        exclude=True,
+        repr=False,
+        title="エディター用のメモ",
+        description="テンプレートに書ける編集者向けメモ。アプリの挙動を変えず、取込・保存・書き出しでは省かれます。",
+        json_schema_extra={"ui_hidden": True, "x-editor-only": True},
+    )
 
 
 # 接続方式・認証・TLS・配送条件をまとめる版付きの接続契約。
 class ConnectionProfile(Model):
+    """保存する接続先の設定。接続・疎通確認は別の処理で行う。"""
+
     id: str = Field(pattern=PROFILE_ID)
     name: str = Field(min_length=1, max_length=120)
     kind: Literal[
@@ -206,28 +236,28 @@ class ConnectionProfile(Model):
             or (self.kind == "kafka" and not self.bootstrap_servers)
         ):
             if not self.host or any(c in self.host for c in "/@?# \r\n"):
-                raise ValueError("ホスト名またはIPアドレスを指定してください")
+                raise ConfigurationError("ホスト名またはIPアドレスを指定してください")
         if (
             self.kind == "oracle"
             and self.connection_method == "host"
             and not (self.service_name or self.sid)
         ):
-            raise ValueError("Oracleのサービス名またはSIDが必要です")
+            raise ConfigurationError("Oracleのサービス名またはSIDが必要です")
         if self.service_name and self.sid:
-            raise ValueError(
+            raise ConfigurationError(
                 "Oracleのサービス名とSIDはどちらか一方を指定してください"
             )
         if (
             self.kind in {"sqlserver", "postgresql", "mysql", "mariadb"}
             and not self.database
         ):
-            raise ValueError("データベース名が必要です")
+            raise ConfigurationError("データベース名が必要です")
         if self.kind == "sqlite" and not self.sqlite_path:
-            raise ValueError("SQLiteファイルを指定してください")
+            raise ConfigurationError("SQLiteファイルを指定してください")
         if self.kind in {"local", "nfs"} and not self.directory:
-            raise ValueError("出力ディレクトリが必要です")
+            raise ConfigurationError("出力ディレクトリが必要です")
         if self.kind == "s3" and not self.bucket:
-            raise ValueError("バケット名が必要です")
+            raise ConfigurationError("バケット名が必要です")
         for value, required in [
             (self.url if self.kind == "http" else "", self.kind == "http"),
             (self.endpoint_url if self.kind == "s3" else "", False),
@@ -241,18 +271,18 @@ class ConnectionProfile(Model):
                     or parsed.password
                     or parsed.fragment
                 ):
-                    raise ValueError(
+                    raise ConfigurationError(
                         "認証情報を含まないHTTP(S) URLを指定してください"
                     )
         if self.kind == "mqtt" and (
             "\x00" in self.topic or any(c in self.topic for c in "#\n\r+")
         ):
-            raise ValueError("送信用トピックにワイルドカードは使用できません")
+            raise ConfigurationError("送信用トピックにワイルドカードは使用できません")
         if any(
             name not in SECRET_FIELDS and name != "nats_token"
             for name in self.clear_secrets
         ):
-            raise ValueError("認証情報の削除対象を確認してください")
+            raise ConfigurationError("認証情報の削除対象を確認してください")
         if self.kind in DATABASE_KINDS - {"sqlite"}:
             auth = {
                 "sqlserver": {
@@ -285,20 +315,20 @@ class ConnectionProfile(Model):
                 self.database_auth not in auth[self.kind]
                 or self.connection_method not in methods[self.kind]
             ):
-                raise ValueError(
+                raise ConfigurationError(
                     "選択したDBに対応する認証方式・接続方法を選んでください"
                 )
             if self.connection_method in {"dsn", "service"} and not self.dsn:
-                raise ValueError(
+                raise ConfigurationError(
                     "DSN・TNSエイリアスまたはサービス名を指定してください"
                 )
             if (
                 self.connection_method == "unix_socket"
                 and not self.unix_socket
             ):
-                raise ValueError("Unixソケットのパスを指定してください")
+                raise ConfigurationError("Unixソケットのパスを指定してください")
         if self.kind == "smb" and not self.share:
-            raise ValueError("SMB共有名を指定してください")
+            raise ConfigurationError("SMB共有名を指定してください")
         if self.kind == "websocket":
             parsed = urlsplit(self.url)
             if (
@@ -307,7 +337,7 @@ class ConnectionProfile(Model):
                 or parsed.username
                 or parsed.password
             ):
-                raise ValueError(
+                raise ConfigurationError(
                     "認証情報を含まないws://またはwss:// URLを指定してください"
                 )
         import re
@@ -322,14 +352,33 @@ class ConnectionProfile(Model):
                 "host",
                 "content-length",
             }:
-                raise ValueError(
+                raise ConfigurationError(
                     "このHTTPヘッダーは認証設定または本文設定で指定してください"
                 )
         return self
 
 
 # 生成済み項目の比較結果に応じて値を置き換える条件。
+def _requires_if(selector, values, key, schema):
+    """指定した生成方法・比較方法でだけ必須になる入力を表す。"""
+    return {
+        "if": {"properties": {selector: {"enum": values}}, "required": [selector]},
+        "then": {"properties": {key: schema}, "required": [key]},
+    }
+
+
+_PARAMETER_REFERENCE = {"type": "string", "pattern": r"^\$"}
+
+
 class Condition(Model):
+    """先に生成した項目と比較し、一致時に値を置き換える設定。"""
+
+    model_config = ConfigDict(json_schema_extra={"allOf": [
+        _requires_if("operator", ["in"], "value", {"anyOf": [
+            {"type": "array"}, _PARAMETER_REFERENCE,
+        ]}),
+    ]})
+
     field: str = Field(pattern=IDENTIFIER)
     operator: Literal["eq", "ne", "gt", "ge", "lt", "le", "in"] = "eq"
     value: Any = None
@@ -337,7 +386,21 @@ class Condition(Model):
 
 
 # 一項目の型・生成方法・依存関係とNULL率を定義する。
-class FieldRule(Model):
+class FieldRule(TemplateAnnotations):
+    """1項目の生成方式と型を定義する。別の項目は定義順で参照する。"""
+
+    model_config = ConfigDict(json_schema_extra={"allOf": [
+        _requires_if("generator", ["choice"], "choices", {"anyOf": [
+            {"type": "array", "minItems": 1}, _PARAMETER_REFERENCE,
+        ]}),
+        _requires_if(
+            "generator", ["reference", "sum", "difference", "product"],
+            "sources", {"minItems": 1},
+        ),
+        _requires_if("generator", ["ratio"], "sources", {"minItems": 2, "maxItems": 2}),
+        _requires_if("generator", ["timestamp"], "start", {"type": "string"}),
+    ]})
+
     name: str = Field(pattern=IDENTIFIER)
     data_type: Literal[
         "string", "integer", "number", "decimal", "boolean", "datetime", "json"
@@ -385,20 +448,22 @@ class FieldRule(Model):
     def valid_rule(self):
         """精度・主キーNULL・参照元の整合性を検証する。"""
         if self.scale > self.precision:
-            raise ValueError("小数桁数は精度以下にしてください")
+            raise ConfigurationError("小数桁数は精度以下にしてください")
         if self.primary_key and self.null_probability:
-            raise ValueError("主キーにNULL率は指定できません")
+            raise ConfigurationError("主キーにNULL率は指定できません")
         if (
             self.generator
             in {"reference", "sum", "difference", "product", "ratio"}
             and not self.sources
         ):
-            raise ValueError("参照元の項目が必要です")
+            raise ConfigurationError("参照元の項目が必要です")
         return self
 
 
 # SQL出力の対象表と操作種別を定義する。
 class SqlOptions(Model):
+    """書き込むテーブルと行の操作を定義する。"""
+
     schema_name: str = Field(default="", pattern=r"^$|" + IDENTIFIER)
     table: str = Field(default="sample_records", pattern=IDENTIFIER)
     operation: Literal["insert", "upsert", "update", "delete"] = "upsert"
@@ -406,6 +471,8 @@ class SqlOptions(Model):
 
 # 模擬画像の寸法・模様・ノイズと欠陥条件を定義する。
 class ImageOptions(Model):
+    """合成画像の寸法・書式・パターンを定義する。"""
+
     width: int = Field(default=320, ge=32, le=4096)
     height: int = Field(default=240, ge=32, le=4096)
     format: Literal["png", "jpeg"] = "png"
@@ -421,6 +488,8 @@ class ImageOptions(Model):
 
 # ファイル分割・名前・書式・圧縮と画像出力をまとめる。
 class FileOptions(Model):
+    """ファイルを書き出す形式、分割と完了通知を定義する。"""
+
     formats: list[Literal["json", "csv", "image"]] = Field(
         default_factory=lambda: ["json", "csv", "image"],
         min_length=1,
@@ -449,6 +518,8 @@ class FileOptions(Model):
 
 # ストリーム本文・包絡・配送再試行の設定を定義する。
 class StreamOptions(Model):
+    """配信する本文の構造・トピック・再試行を指定する。"""
+
     envelope: bool = True
     metadata_key: str = Field(default="_source", pattern=IDENTIFIER)
     http_body: Literal["array", "single", "ndjson"] = "array"
@@ -502,13 +573,17 @@ def default_fields():
 
 # 異常適用対象を選ぶ項目比較の条件。
 class Predicate(Model):
+    """生成済みの値が異常の適用条件に一致するかを定義する。"""
+
     field: str = Field(pattern=IDENTIFIER)
     operator: Literal["eq", "ne", "gt", "ge", "lt", "le", "in"] = "eq"
     value: Any = None
 
 
 # 行範囲・確率・周期と操作を指定する異常注入ルール。
-class AnomalyRule(Model):
+class AnomalyRule(TemplateAnnotations):
+    """通常値へ、指定した範囲・頻度・条件で異常を適用する。"""
+
     name: str = Field(default="異常注入", min_length=1, max_length=120)
     enabled: bool = True
     field: str = Field(pattern=IDENTIFIER)
@@ -535,12 +610,14 @@ class AnomalyRule(Model):
     def valid_range(self):
         """異常の終了位置が開始位置より前にならないことを確認する。"""
         if self.to_row is not None and self.to_row < self.from_row:
-            raise ValueError("異常終了位置は開始位置以上にしてください")
+            raise ConfigurationError("異常終了位置は開始位置以上にしてください")
         return self
 
 
 # バッチ境界の遅延・失敗と成果物破損の模擬条件を定義する。
 class FaultOptions(Model):
+    """処理や配送の障害を実行中に再現する。"""
+
     enabled: bool = False
     stage: Literal["before_batch", "after_write"] = "before_batch"
     action: Literal["none", "fail", "delay"] = "none"
@@ -560,7 +637,9 @@ class FaultOptions(Model):
 
 
 # 生成量・速度・項目定義・出力条件と異常設定を束ねる実行契約。
-class RunSpec(Model):
+class RunSpec(TemplateAnnotations):
+    """生成件数、乱数、項目定義と出力先への参照を保持する。"""
+
     version: Literal[2] = 2
     name: str = Field(default="カスタムデータ", min_length=1, max_length=120)
     description: str = Field(default="", max_length=1000)
@@ -608,14 +687,14 @@ class RunSpec(Model):
         """項目名とメタ情報キーの衝突、パラメーターの非有限数を拒否する。"""
         names = [f.name.casefold() for f in self.fields]
         if len(set(names)) != len(names):
-            raise ValueError("項目名は重複できません")
+            raise ConfigurationError("項目名は重複できません")
         if self.stream.envelope and self.stream.metadata_key in {
             f.name for f in self.fields
         }:
-            raise ValueError(
+            raise ConfigurationError(
                 "ストリームのメタデータ名と生成項目名が重複しています"
             )
         for value in self.parameters.values():
             if isinstance(value, float) and not math.isfinite(value):
-                raise ValueError("パラメーターには有限の数を指定してください")
+                raise ConfigurationError("パラメーターには有限の数を指定してください")
         return self

@@ -10,7 +10,8 @@ import threading
 import time
 from pathlib import Path
 from models import Spec
-from generation import generate_record, validate_generation
+from api_support import display_location, history_error
+from generation import GenerationError, generate_record, validate_generation
 
 
 class Controller:
@@ -43,6 +44,7 @@ class Controller:
                 "produced": self.produced,
                 "requests": self.requests,
                 "error": self.error,
+                "error_message": history_error(self.error),
                 "dataset_id": self.ds,
                 "recent": list(self.recent)[-30:],
                 "elapsed_seconds": round(time.time() - self.started, 2)
@@ -159,7 +161,7 @@ class Controller:
             raise RuntimeError("disk_space_low")
         for line in Path("/proc/meminfo").read_text().splitlines():
             if line.startswith("MemAvailable:") and int(line.split()[1]) < int(
-                float(os.environ.get("MIN_AVAILABLE_GIB", "6")) * 1024**2
+                float(os.environ.get("MIN_AVAILABLE_GIB", "1")) * 1024**2
             ):
                 raise RuntimeError("host_memory_headroom_low")
         if (
@@ -207,14 +209,8 @@ class Controller:
             self.status = "stopped"
         except Exception as exc:
             self.error = (
-                str(exc)
-                if isinstance(exc, ValueError)
-                or str(exc)
-                in {
-                    "disk_space_low",
-                    "host_memory_headroom_low",
-                    "storage_limit",
-                }
+                f"generation_error: {display_location(exc.path)}　{exc}" if isinstance(exc, GenerationError)
+                else str(exc) if str(exc) in {"disk_space_low", "host_memory_headroom_low", "storage_limit"}
                 else type(exc).__name__
             )
             self.status = "failed"

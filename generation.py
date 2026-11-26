@@ -1,6 +1,6 @@
-"""宣言的な項目定義から再現可能なデータと意図的な異常を生成する。
+"""項目の生成、型変換、条件判定、異常値の適用を行う。
 
-式の評価にevalを使わず、許可した演算・参照だけを解釈する。
+行と項目ごとに乱数を固定し、出力先やバッチ分割に依存せず結果を再現できるようにする。
 """
 
 from __future__ import annotations
@@ -12,30 +12,45 @@ import random
 import re
 import string
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal, localcontext
+from decimal import Decimal, InvalidOperation, localcontext
 
 from config import RunSpec
 
 
 class GenerationError(ValueError):
-    """生成定義・型・容量の制約違反を表す入力エラー。"""
+    """生成設定の不備と、設定内で修正する位置を保持する。"""
 
-    pass
+    def __init__(self, message, *, path=()):
+        super().__init__(message)
+        self.path = tuple(path)
+
+
+@contextmanager
+def generation_context(*path):
+    """生成例外を、入力値を含まない設定エラーに変換する。"""
+    try:
+        yield
+    except GenerationError as exc:
+        if exc.path:
+            raise
+        raise GenerationError(str(exc), path=path) from None
+    except (ArithmeticError, IndexError, TypeError, ValueError):
+        raise GenerationError(
+            "値の型・範囲・書式を確認してください", path=path
+        ) from None
 
 
 def record_key(spec, sequence):
-    """実行キー・seed・連番から再生成しても同じ行識別子を作る。"""
+    """実行キー・シード・通番から再試行でも変わらないレコード識別子を作る。"""
     return hashlib.sha256(
         f"source.v2:{spec.run_key}:{spec.seed}:{sequence}".encode()
     ).hexdigest()[:32]
 
 
 def encode_json(value, *, pretty=False, limit=1024 * 1024):
-    """非有限数を拒否し、UTF-8バイト数の上限内でJSONへ変換する。
-
-    上限超過はGenerationErrorとし、巨大な結果の完成前に検出する。
-    """
+    """非有限数を拒否し、UTF-8のバイト数上限を守ってJSONへ直列化する。"""
     chunks = []
     size = 0
     encoder = json.JSONEncoder(
@@ -53,24 +68,22 @@ def encode_json(value, *, pretty=False, limit=1024 * 1024):
 
 
 def resolve(value, parameters):
-    """$で始まる値を名前付きパラメーターへ解決し、未定義参照を拒否する。"""
+    """先頭がドル記号の値だけをパラメーター参照として解決する。"""
     if isinstance(value, str) and value.startswith("$"):
         key = value[1:]
         if key not in parameters:
-            raise GenerationError(f"パラメーター {key} が定義されていません")
+            raise GenerationError("参照するパラメーターが定義されていません")
         return parameters[key]
     return value
 
 
 def render(template, values):
-    """項目名と限定した短い書式だけを許可してテンプレートを展開する。
+    """項目名と短い数値書式だけを許可してテンプレートを展開する。
 
-    属性参照や変換指定を許可せず、結果長の上限も検証する。
+    属性アクセスや変換指定は受け付けず、展開後の長さにも上限を設ける。
     """
     parts = []
-    for literal, name, format_spec, conversion in string.Formatter().parse(
-        template
-    ):
+    for literal, name, format_spec, conversion in string.Formatter().parse(template):
         parts.append(literal)
         if name is None:
             continue
@@ -85,8 +98,14 @@ def render(template, values):
                 "テンプレートは項目名と短い数値書式だけを参照できます"
             )
         if name not in values:
-            raise GenerationError(f"テンプレート参照 {name} が見つかりません")
-        parts.append(format(values[name], format_spec))
+            raise GenerationError("テンプレートで参照する項目が見つかりません")
+        value = values[name]
+        if format_spec.endswith("d") and not isinstance(value, int):
+            raise GenerationError("整数書式 d では整数型の項目を参照してください")
+        try:
+            parts.append(format(value, format_spec))
+        except (TypeError, ValueError):
+            raise GenerationError("テンプレートの書式と参照先の型を合わせてください") from None
     result = "".join(parts)
     if len(result) > 8192:
         raise GenerationError("テンプレート結果が長すぎます")
@@ -94,7 +113,10 @@ def render(template, values):
 
 
 def coerce(value, field):
-    """項目型へ変換し、主キーNULL・精度・文字数・日時の制約を検証する。"""
+    """項目定義に合わせて値を変換し、型・精度・NULLの制約を検査する。
+
+    小数は精度を保つ文字列、日時はUTCのISO表現として返す。
+    """
     if value is None:
         if field.primary_key:
             raise GenerationError("主キーはNULLにできません")
@@ -120,17 +142,13 @@ def coerce(value, field):
             return round(number, field.scale)
         with localcontext() as context:
             context.prec = 60
-            result = Decimal(str(value)).quantize(
-                Decimal(1).scaleb(-field.scale)
-            )
+            result = Decimal(str(value)).quantize(Decimal(1).scaleb(-field.scale))
         if len(result.as_tuple().digits) > field.precision:
             raise GenerationError("小数の精度上限を超えています")
         return str(result)
     if dtype == "boolean":
         if not isinstance(value, bool):
-            raise GenerationError(
-                "真偽値の項目にはboolean生成を指定してください"
-            )
+            raise GenerationError("真偽値の項目にはboolean生成を指定してください")
         return value
     if dtype == "datetime":
         dt = datetime.fromisoformat(str(value))
@@ -140,48 +158,101 @@ def coerce(value, field):
     return value
 
 
-def generate_record(
-    spec: RunSpec, sequence: int, *, apply_anomalies=True, trace=None
-):
-    """連番と項目別seedで一行を生成し、最後に指定の異常ルールを適用する。
+_GENERATOR_INPUT = {
+    "template": "template",
+    "timestamp": "start",
+    "sequence": "start",
+    "uniform": "minimum",
+    "integer": "minimum",
+    "normal": "stddev",
+    "choice": "choices",
+    "boolean": "probability",
+    "constant": "value",
+    "reference": "sources",
+    "sum": "sources",
+    "difference": "sources",
+    "product": "sources",
+    "ratio": "sources",
+}
 
-    依存項目は定義順に解決する。apply_anomalies=Falseは異常コピー時の再帰適用を防ぐ。
+
+def generate_record(spec: RunSpec, sequence: int, *, apply_anomalies=True, trace=None):
+    """通番に対応する一行を定義順に生成し、必要なら異常ルールを適用する。
+
+    乱数をレコードと項目ごとに固定するため、バッチ分割に依存しない。
+    参照項目は先に生成されている必要がある。
     """
     row = {}
     key = record_key(spec, sequence)
     parameters = spec.parameters
-    for field in spec.fields:
-        rng = random.Random(
-            int(
-                hashlib.sha256((key + ":" + field.name).encode()).hexdigest()[
-                    :16
-                ],
-                16,
+    for index, field in enumerate(spec.fields):
+        path = ("fields", index)
+        input_key = _GENERATOR_INPUT.get(field.generator, "generator")
+        with generation_context(*path):
+            rng = random.Random(
+                int(hashlib.sha256((key + ":" + field.name).encode()).hexdigest()[:16], 16)
             )
-        )
+            value = _generate_field(
+                field, row, parameters, sequence, key, rng, input_key, path
+            )
+            if field.condition:
+                if field.condition.field not in row:
+                    raise GenerationError(
+                        "条件が参照する項目を先に定義してください",
+                        path=(*path, "condition", "field"),
+                    )
+                value = conditional_value(field, value, row, parameters, path)
+            if field.null_probability and rng.random() < field.null_probability:
+                value = None
+            with generation_context(*path, "data_type"):
+                row[field.name] = coerce(value, field)
+    if apply_anomalies:
+        row = inject_anomalies(spec, row, sequence, trace)
+    return row
 
-        def get(name):
-            """現在のフィールド設定から値を取り、パラメーター参照を解決する。"""
-            return resolve(getattr(field, name), parameters)
 
-        group = int(get("group_size"))
-        if group < 1:
-            raise GenerationError("group_sizeは1以上にしてください")
-        index = sequence // group
-        modulo = int(get("modulo"))
-        if modulo < 0:
-            raise GenerationError("moduloは0以上にしてください")
-        if modulo:
-            index %= modulo
-        kind = field.generator
+def _generate_field(field, row, parameters, sequence, key, rng, input_key, path):
+    """一項目の値を作る。条件、欠測率、型変換は呼び出し側で適用する。"""
+
+    def get(name, convert=None):
+        """パラメーターと型のエラーを、実際に指定されたキーへひも付ける。"""
+        try:
+            value = resolve(getattr(field, name), parameters)
+            return convert(value) if convert else value
+        except GenerationError as exc:
+            raise GenerationError(str(exc), path=(*path, name)) from None
+        except (ArithmeticError, TypeError, ValueError):
+            raise GenerationError("値の型と範囲を確認してください", path=(*path, name)) from None
+
+    group = get("group_size", int)
+    if group < 1:
+        raise GenerationError("group_sizeは1以上にしてください", path=(*path, "group_size"))
+    index = sequence // group
+    modulo = get("modulo", int)
+    if modulo < 0:
+        raise GenerationError("moduloは0以上にしてください", path=(*path, "modulo"))
+    if modulo:
+        index %= modulo
+    kind = field.generator
+    with generation_context(*path, input_key):
         if kind == "record_id":
             value = key
         elif kind == "uuid":
             value = str(uuid.uuid5(uuid.NAMESPACE_URL, key + ":" + field.name))
         elif kind == "sequence":
-            value = float(get("start")) + index * float(get("step"))
+            start = get("start")
+            step = get("step")
+            # Pythonのfloatで正確に表せない通番でも、整数の開始値と増分は精度を保つ。
+            if isinstance(start, int) and isinstance(step, int):
+                value = start + index * step
+            else:
+                value = get("start", float) + index * get("step", float)
+                if not math.isfinite(value):
+                    raise GenerationError("連番の開始値と増分には有限の数を指定してください")
+                if field.data_type == "string" and value.is_integer():
+                    value = int(value)
         elif kind in {"integer", "uniform"}:
-            low, high = float(get("minimum")), float(get("maximum"))
+            low, high = get("minimum", float), get("maximum", float)
             if low > high:
                 raise GenerationError("最小値が最大値を超えています")
             value = (
@@ -190,10 +261,10 @@ def generate_record(
                 else rng.uniform(low, high)
             )
         elif kind == "normal":
-            deviation = float(get("stddev"))
+            deviation = get("stddev", float)
             if deviation < 0:
                 raise GenerationError("標準偏差は0以上にしてください")
-            value = rng.gauss(float(get("mean")), deviation)
+            value = rng.gauss(get("mean", float), deviation)
         elif kind == "choice":
             choices = get("choices")
             if not isinstance(choices, list) or not choices:
@@ -203,10 +274,10 @@ def generate_record(
                 or min(field.weights) < 0
                 or sum(field.weights) <= 0
             ):
-                raise GenerationError("選択肢と重みを確認してください")
+                raise GenerationError("選択肢と重みを確認してください", path=(*path, "weights"))
             value = rng.choices(choices, weights=field.weights or None, k=1)[0]
         elif kind == "boolean":
-            probability = float(get("probability"))
+            probability = get("probability", float)
             if not 0 <= probability <= 1:
                 raise GenerationError("確率は0〜1にしてください")
             value = rng.random() < probability
@@ -221,16 +292,12 @@ def generate_record(
             at = datetime.fromisoformat(str(get("start")))
             if at.tzinfo is None:
                 raise GenerationError("開始日時にはタイムゾーンが必要です")
-            value = (
-                at + timedelta(seconds=index * float(get("step")))
-            ).isoformat()
+            value = (at + timedelta(seconds=index * get("step", float))).isoformat()
         else:
             try:
                 values = [row[name] for name in field.sources]
             except KeyError as exc:
-                raise GenerationError(
-                    "参照元の項目は先に定義してください"
-                ) from exc
+                raise GenerationError("参照元の項目は先に定義してください") from exc
             if kind == "reference":
                 value = values[0]
             else:
@@ -246,57 +313,78 @@ def generate_record(
                         value = math.prod(numeric)
                     elif kind == "ratio":
                         if len(numeric) != 2 or not numeric[1]:
-                            raise GenerationError(
-                                "比率には0でない分母が必要です"
-                            )
+                            raise GenerationError("比率には0でない分母が必要です")
                         value = numeric[0] / numeric[1]
-        if field.condition:
-            condition = field.condition
-            if condition.field not in row:
-                raise GenerationError(
-                    "条件が参照する項目を先に定義してください"
-                )
-            left, right = (
-                row[condition.field],
-                resolve(condition.value, parameters),
-            )
-            op = condition.operator
-            matches = {
-                "eq": lambda: left == right,
-                "ne": lambda: left != right,
-                "gt": lambda: left > right,
-                "ge": lambda: left >= right,
-                "lt": lambda: left < right,
-                "le": lambda: left <= right,
-                "in": lambda: left in right,
-            }[op]()
-            if matches:
-                value = resolve(condition.then_value, parameters)
-        if field.null_probability and rng.random() < field.null_probability:
-            value = None
-        row[field.name] = coerce(value, field)
-    if apply_anomalies:
-        row = inject_anomalies(spec, row, sequence, trace)
-    return row
+    return value
+
+
+def conditional_value(field, value, row, parameters, path):
+    """条件が成立した行だけ、生成した値を置き換える。"""
+    condition = field.condition
+    path = (*path, "condition")
+    with generation_context(*path, "value"):
+        applies = matches(
+            row[condition.field], condition.operator, resolve(condition.value, parameters)
+        )
+    if applies:
+        with generation_context(*path, "then_value"):
+            return resolve(condition.then_value, parameters)
+    return value
 
 
 def matches(left, operator, right):
-    """宣言的な比較演算子を対応する比較処理へ割り当てる。"""
-    return {
-        "eq": lambda: left == right,
-        "ne": lambda: left != right,
-        "gt": lambda: left > right,
-        "ge": lambda: left >= right,
-        "lt": lambda: left < right,
-        "le": lambda: left <= right,
-        "in": lambda: left in right,
-    }[operator]()
+    """欠測値は順序比較に一致せず、inにはJSON配列を要求する。"""
+    if operator == "eq":
+        return left == right
+    if operator == "ne":
+        return left != right
+    if operator == "in":
+        if not isinstance(right, list):
+            raise GenerationError("in の比較値にはJSON配列を指定してください")
+        return left in right
+    if left is None or right is None:
+        return False
+    try:
+        if operator == "gt":
+            return left > right
+        if operator == "ge":
+            return left >= right
+        if operator == "lt":
+            return left < right
+        return left <= right
+    except TypeError:
+        return False
 
+
+def numeric_anomaly(original, value, operation, distance):
+    """数値異常の量は検証し、計算できない元の値はそのままにする。"""
+    try:
+        amount = Decimal(str(value))
+    except InvalidOperation:
+        raise GenerationError("加算・倍率・ドリフトの指定値には数値が必要です") from None
+    if not amount.is_finite():
+        raise GenerationError("加算・倍率・ドリフトの指定値には有限の数が必要です")
+    if original is None:
+        return None
+    try:
+        number = Decimal(str(original))
+    except InvalidOperation:
+        return None
+    if not number.is_finite():
+        return None
+    with localcontext() as context:
+        context.prec = 60
+        if operation == "multiply":
+            return number * amount
+        if operation == "ramp":
+            return number + amount * distance
+        return number + amount
 
 def inject_anomalies(spec, row, sequence, trace=None):
-    """行位置・確率・条件に合う異常を定義順で適用する。
+    """位置・確率・条件が一致した異常ルールを行へ順番に適用する。
 
-    trace指定時は適用名を追記する。検証の迂回は明示されたルールだけで行う。
+    コピー元は異常注入前の行から再生成し、再帰的な異常適用を避ける。
+    明示された検証迂回ルール以外は項目の型制約を再確認する。
     """
     offset = sequence - spec.start_sequence
     fields = {f.name: f for f in spec.fields}
@@ -311,82 +399,81 @@ def inject_anomalies(spec, row, sequence, trace=None):
         rng = random.Random(
             int(
                 hashlib.sha256(
-                    (
-                        record_key(spec, sequence) + ":anomaly:" + str(index)
-                    ).encode()
+                    (record_key(spec, sequence) + ":anomaly:" + str(index)).encode()
                 ).hexdigest()[:16],
                 16,
             )
         )
         if rng.random() >= rule.probability:
             continue
+        path = ("anomalies", index)
         if rule.field not in fields:
-            raise GenerationError("異常ルールの対象項目が定義されていません")
+            raise GenerationError(
+                "異常ルールの対象項目が定義されていません", path=(*path, "field")
+            )
         if rule.when:
-            if rule.when.field not in row:
-                raise GenerationError("異常条件が参照する項目が見つかりません")
-            if not matches(
-                row[rule.when.field],
-                rule.when.operator,
-                resolve(rule.when.value, spec.parameters),
-            ):
-                continue
-        if trace is not None:
-            trace.append(rule.name)
+            if rule.when.field not in fields:
+                raise GenerationError(
+                    "異常条件が参照する項目が見つかりません",
+                    path=(*path, "when", "field"),
+                )
+            with generation_context(*path, "when", "value"):
+                if not matches(
+                    row.get(rule.when.field),
+                    rule.when.operator,
+                    resolve(rule.when.value, spec.parameters),
+                ):
+                    continue
         if rule.operation == "omit":
             row.pop(rule.field, None)
-            continue
-        value = resolve(rule.value, spec.parameters)
-        original = row.get(rule.field)
-        if rule.operation == "set":
-            result = value
-        elif rule.operation == "null":
-            result = None
-        elif rule.operation in {"freeze", "copy_from"}:
-            anchor = (
-                rule.from_row if rule.operation == "freeze" else int(value)
-            )
-            if anchor < 0:
-                raise GenerationError(
-                    "コピー元のレコード位置は0以上にしてください"
-                )
-            result = generate_record(
-                spec, spec.start_sequence + anchor, apply_anomalies=False
-            )[rule.field]
-        elif rule.operation == "timestamp_shift":
-            result = (
-                datetime.fromisoformat(str(original))
-                + timedelta(seconds=float(value))
-            ).isoformat()
         else:
-            with localcontext() as context:
-                context.prec = 60
-                number = Decimal(str(original))
-                amount = Decimal(str(value))
-                result = (
-                    number * amount
-                    if rule.operation == "multiply"
-                    else number + amount * (offset - rule.from_row)
-                    if rule.operation == "ramp"
-                    else number + amount
+            with generation_context(*path, "value"):
+                value = (
+                    resolve(rule.value, spec.parameters)
+                    if rule.operation not in {"null", "freeze"}
+                    else None
                 )
-        if rule.bypass_validation and isinstance(result, Decimal):
-            result = (
-                str(result)
-                if fields[rule.field].data_type == "decimal"
-                else float(result)
-            )
-        row[rule.field] = (
-            result
-            if rule.bypass_validation
-            else coerce(result, fields[rule.field])
-        )
+                original = row.get(rule.field)
+                if rule.operation == "set":
+                    result = value
+                elif rule.operation == "null":
+                    result = None
+                elif rule.operation in {"freeze", "copy_from"}:
+                    anchor = rule.from_row if rule.operation == "freeze" else int(value)
+                    if anchor < 0:
+                        raise GenerationError("コピー元のレコード位置は0以上にしてください")
+                    result = generate_record(
+                        spec, spec.start_sequence + anchor, apply_anomalies=False
+                    )[rule.field]
+                elif rule.operation == "timestamp_shift":
+                    if original is None:
+                        continue
+                    result = (
+                        datetime.fromisoformat(str(original)) + timedelta(seconds=float(value))
+                    ).isoformat()
+                else:
+                    result = numeric_anomaly(
+                        original, value, rule.operation, offset - rule.from_row
+                    )
+                    if result is None:
+                        continue
+                if rule.bypass_validation and isinstance(result, Decimal):
+                    result = (
+                        str(result)
+                        if fields[rule.field].data_type == "decimal"
+                        else float(result)
+                    )
+                row[rule.field] = (
+                    result if rule.bypass_validation else coerce(result, fields[rule.field])
+                )
+        if trace is not None:
+            trace.append(rule.name)
     return row
 
 
 def sample_offsets(spec):
-    """先頭・中間・末尾と異常開始終了の境界を検査用位置として返す。"""
-    offsets = {0, min(97, spec.rows - 1), spec.rows - 1}
+    """先頭・途中・末尾と異常ルールの境界を含む代表位置を返す。"""
+    offsets = {*range(min(3, spec.rows)), min(97, spec.rows - 1), spec.rows - 1}
     for rule in spec.anomalies:
         if rule.enabled and rule.from_row < spec.rows:
             offsets.add(rule.from_row)
@@ -396,69 +483,46 @@ def sample_offsets(spec):
     return sorted(offsets)
 
 
-def validate_generation(spec):
-    # 全件を実体化せず、先頭・途中・末尾と異常境界を代表点として検査する。
-    """全件生成せず境界サンプルと本文テンプレートを事前検証する。
+def sample_payloads(spec, row, sequence, kind):
+    """選んだ出力方式に関係するペイロードを検証用に生成する。"""
+    if kind in {None, "files"} and spec.files.json_template is not None:
+        if kind is None or "json" in spec.files.formats:
+            with generation_context("files", "json_template"):
+                yield map_json(
+                    spec.files.json_template,
+                    row,
+                    spec.parameters,
+                    {
+                        "sequence": sequence,
+                        "record_key": record_key(spec, sequence),
+                        "run_key": spec.run_key,
+                    },
+                )
+    if kind == "stream" or (kind is None and spec.stream.payload_template is not None):
+        with generation_context("stream", "payload_template"):
+            yield stream_payload(spec, row, sequence)
 
-    代表点の検査であり、全連番の成功を保証するものではない。
-    """
+
+def validate_generation(spec, *, kind=None):
+    """異常境界などの代表行を生成し、出力本文の参照と容量を検証する。"""
     for offset in sample_offsets(spec):
         sequence = spec.start_sequence + offset
         row = generate_record(spec, sequence)
         encode_json(row)
-        for template in [
-            spec.files.json_template,
-            spec.stream.payload_template,
-        ]:
-            if template is not None:
-                encode_json(
-                    map_json(
-                        template,
-                        row,
-                        spec.parameters,
-                        {
-                            "sequence": sequence,
-                            "record_key": record_key(spec, sequence),
-                            "run_key": spec.run_key,
-                        },
-                    )
-                )
+        for payload in sample_payloads(spec, row, sequence, kind):
+            encode_json(payload)
     return spec
 
 
-def batch_limit(spec, requested):
-    """代表レコードの大きさとバースト指定からバッチ件数を抑える。
-
-    16MiBを基準に余裕を見積もるが、後続行の最大サイズを厳密には保証しない。
-    """
+def batch_limit(spec, requested, *, kind=None):
+    """代表行の大きさから、メモリに収まるバッチサイズを見積もる。"""
     size = 256
     for offset in sample_offsets(spec):
-        row = generate_record(spec, spec.start_sequence + offset)
+        sequence = spec.start_sequence + offset
+        row = generate_record(spec, sequence)
         size = max(size, len(encode_json(row).encode()))
-        for template in [
-            spec.files.json_template,
-            spec.stream.payload_template,
-        ]:
-            if template is not None:
-                size = max(
-                    size,
-                    len(
-                        encode_json(
-                            map_json(
-                                template,
-                                row,
-                                spec.parameters,
-                                {
-                                    "sequence": spec.start_sequence + offset,
-                                    "record_key": record_key(
-                                        spec, spec.start_sequence + offset
-                                    ),
-                                    "run_key": spec.run_key,
-                                },
-                            )
-                        ).encode()
-                    ),
-                )
+        for payload in sample_payloads(spec, row, sequence, kind):
+            size = max(size, len(encode_json(payload).encode()))
     return max(
         1,
         min(
@@ -470,9 +534,9 @@ def batch_limit(spec, requested):
 
 
 def map_json(template, row, parameters, metadata, depth=0):
-    """辞書・配列をたどり、許可した名前空間の参照をJSONへ反映する。
+    """行・パラメーター・メタ情報への参照を、型を保ってJSON構造へ写す。
 
-    入れ子の深さと参照先を検証する。template=Noneは元の行を返す。
+    未知の参照と深すぎる入れ子を拒否する。通常の文字列は展開しない。
     """
     if template is None:
         return row
@@ -484,60 +548,43 @@ def map_json(template, row, parameters, metadata, depth=0):
             for k, v in template.items()
         }
     if isinstance(template, list):
-        return [
-            map_json(v, row, parameters, metadata, depth + 1) for v in template
-        ]
+        return [map_json(v, row, parameters, metadata, depth + 1) for v in template]
     if isinstance(template, str) and template.startswith(
         ("$row.", "$parameters.", "$meta.")
     ):
         namespace, *parts = template[1:].split(".")
-        value = {"row": row, "parameters": parameters, "meta": metadata}[
-            namespace
-        ]
+        value = {"row": row, "parameters": parameters, "meta": metadata}[namespace]
         for part in parts:
             if isinstance(value, dict) and part in value:
                 value = value[part]
-            elif (
-                isinstance(value, list)
-                and part.isdigit()
-                and int(part) < len(value)
-            ):
+            elif isinstance(value, list) and part.isdigit() and int(part) < len(value):
                 value = value[int(part)]
             else:
-                raise GenerationError(
-                    "JSONテンプレートの参照先が見つかりません"
-                )
+                raise GenerationError("JSONテンプレートの参照先が見つかりません")
         return value
     return template
 
 
 def stream_payload(spec, row, sequence):
-    """本文テンプレートへ行とメタ情報を渡し、必要なら包絡を付ける。
-
-    メタ情報のキー衝突やオブジェクトでない本文を拒否する。
-    """
+    """本文を組み立て、指定時だけ衝突しないキーへメタ情報を付ける。"""
     metadata = {
         "record_key": record_key(spec, sequence),
         "sequence": sequence,
         "run_key": spec.run_key,
     }
-    payload = map_json(
-        spec.stream.payload_template, row, spec.parameters, metadata
-    )
+    payload = map_json(spec.stream.payload_template, row, spec.parameters, metadata)
     if spec.stream.envelope:
         if not isinstance(payload, dict):
             raise GenerationError(
                 "メタデータを追加する場合、本文テンプレートはJSONオブジェクトにしてください"
             )
         if spec.stream.metadata_key in payload:
-            raise GenerationError(
-                "メタデータの項目名と送信本文のキーが重複しています"
-            )
+            raise GenerationError("メタデータの項目名と送信本文のキーが重複しています")
         payload = {**payload, spec.stream.metadata_key: metadata}
     return payload
 
 
 def inject_fault(spec, ctx, stage, batch):
-    """有効な障害設定だけを実行コンテキストの注入処理へ委譲する。"""
+    """異常シナリオが有効な場合だけ、指定段階の停止・遅延判定へ委譲する。"""
     if spec.faults.enabled and spec.faults.action != "none":
         ctx.inject(stage, batch)
