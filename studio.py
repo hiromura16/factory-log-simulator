@@ -298,7 +298,10 @@ def create_app(kind):
 
         管理画面全体のログイン制御ではない。秘密値比較には定数時間比較を使う。
         """
-        p = controller.profile or store.profile()[0]
+        try:
+            p = controller.source_profile()
+        except KeyError:
+            raise HTTPException(503, "保存済みの公開設定を確認してください") from None
         mode = p.auth_mode
         ok = mode == "none"
         if mode == "basic":

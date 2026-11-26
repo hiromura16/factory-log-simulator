@@ -136,20 +136,18 @@ class Controller:
 
         スレッドが残る場合はstoppingとし、停止完了を装わない。
         """
-        self.stop_event.set()
-        self.store.meta(
-            "desired",
-            {
-                "running": False,
-                "spec": self.spec.model_dump(mode="json")
-                if self.spec
-                else None,
-            },
-        )
-        if self.thread:
-            self.thread.join(timeout=15)
-        if self.thread and self.thread.is_alive():
-            self.status = "stopping"
+        with self.lock:
+            self.stop_event.set()
+            desired = self.store.meta("desired")
+            if desired:
+                # 停止を繰り返しても、前回の公開設定と版を保持する。
+                self.store.meta("desired", {**desired, "running": False})
+            thread = self.thread
+        if thread:
+            thread.join(timeout=15)
+            with self.lock:
+                if self.thread is thread and thread.is_alive():
+                    self.status = "stopping"
         return self.snapshot()
 
     def guard(self):
@@ -226,6 +224,31 @@ class Controller:
                     await self.driver.close()
                 except Exception:
                     pass
+
+    def source_profile(self):
+        """生成を再開せず、保存済みデータの取得用プロフィールを選ぶ。"""
+        if self.profile is not None:
+            return self.profile
+        desired = self.store.meta("desired")
+        saved = desired.get("spec") if desired else None
+        if saved is None:
+            with self.store.db() as db:
+                if db.execute("SELECT 1 FROM events LIMIT 1").fetchone():
+                    raise KeyError("missing saved source profile")
+            return self.store.profile()[0]
+        if not isinstance(saved, dict):
+            raise KeyError("invalid source configuration")
+        identity = saved.get("profile_id")
+        revision = desired.get("revision")
+        if not isinstance(identity, str) or not identity:
+            raise KeyError("invalid source profile")
+        if revision is not None and (type(revision) is not int or revision < 1):
+            raise KeyError("invalid source profile revision")
+        profile, stored_revision = self.store.profile(identity, revision)
+        # 旧版の停止記録には版がない。版が1つと分かる場合だけ照合する。
+        if revision is None and stored_revision != 1:
+            raise KeyError("ambiguous source profile revision")
+        return profile
 
     def source_spec(self):
         """現在の設定、保存された希望設定、既定設定の順で取得する。"""

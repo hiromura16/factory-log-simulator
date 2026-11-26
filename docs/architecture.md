@@ -2,7 +2,7 @@
 
 | 種類 | リポジトリ | 画面ポート | 収集方法 |
 | --- | --- | --- | --- |
-| SQL | factory-mes-erp-simulator | 3560 | DBをCDC/クエリで取得 |
+| SQL | factory-sql-data-loader | 3560 | DBをCDC/クエリで取得 |
 | ファイル | factory-file-generator | 3561 | landingのready.jsonを起点に取得 |
 | ストリーム | factory-stream-simulator | 3562 | MQTT/Kafka/HTTP等 |
 | 設備 | factory-equipment-simulator | 3640 | OPC UA 3645 / Modbus TCP 3646 |
