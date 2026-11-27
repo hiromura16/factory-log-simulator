@@ -26,6 +26,7 @@ from config import ConfigurationError
 from generation import anomaly_warnings
 from generation import generate_record, sample_offsets
 from store import Store
+from preset_editor import PresetLibrary, clean_secrets, install_preset_editor, require_safe_preset
 from operation_confirmation import CONFIRMATION_HEADER, install_operation_gate
 from api_support import (
     install_error_handlers, install_help,
@@ -236,6 +237,7 @@ def create_app(kind):
                     )
                 )
     store.seed(root / "presets")
+    preset_library = PresetLibrary(store.db, root / "presets", "data")
 
     @asynccontextmanager
     async def lifespan(app):
@@ -274,13 +276,14 @@ def create_app(kind):
                     {"detail": "別サイトからの操作は禁止されています"}, 403
                 )
             if (
-                request.headers.get("content-type", "").split(";")[0]
+                not (request.method == "DELETE" and request.url.path.startswith("/api/preset-editor/"))
+                and request.headers.get("content-type", "").split(";")[0]
                 != "application/json"
             ):
                 return JSONResponse(
                     {"detail": "application/jsonが必要です"}, 415
                 )
-            if len(await request.body()) > 2 * 1024**2:
+            if not request.url.path.startswith("/api/preset-editor") and len(await request.body()) > 2 * 1024**2:
                 return JSONResponse(
                     {"detail": "JSONは2MiB以下にしてください"}, 413
                 )
@@ -473,7 +476,7 @@ def create_app(kind):
     )
     def presets():
         """同梱・保存済みのひな型と内容を返します。読み取りで生成や実行は始まりません。"""
-        return {"presets": store.presets()}
+        return {"presets": [dict(item, spec=clean_secrets(item["spec"])) for item in store.presets()]}
 
     # 指定IDのプリセットを検証済み設定で保存する。
     @app.post(
@@ -486,6 +489,8 @@ def create_app(kind):
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", identity):
             raise HTTPException(422, "プリセットIDを確認してください")
         validate_source_spec(kind, spec)
+        preset_library.require_writable(identity)
+        require_safe_preset(spec.model_dump(mode="json"))
         return store.save_preset(identity, spec)
 
     # 境界サンプルを生成し、実行を始めずにデータと異常の影響を確認する。
@@ -721,4 +726,5 @@ def create_app(kind):
         from data_api import register_data_routes
 
         register_data_routes(app, controller, authorize)
+    install_preset_editor(app, preset_library, Spec, lambda spec: validate_source_spec(kind, spec))
     return app

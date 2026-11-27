@@ -117,6 +117,8 @@ function tab(
       /* ナビゲーションのdata-tabが選択IDと一致するときだけactiveを付与する。 */ (x) =>
         x.classList.toggle("active", x.dataset.tab === id),
     );
+  if (id === "json") window.FactoryPresetEditor.activate();
+
 }
 /* ローカルJSON Schemaの$refを$defsから引く。外部URLの取得や参照先の存在検証は行わない。 */
 function ref(
@@ -714,73 +716,26 @@ async function init() {
       notice("停止しました。保存済みデータは残ります。");
     },
   );
-  action(
-    "#toJson",
-    /* フォーム検証後のspecを整形JSON欄へ転記してJSONタブを開く。 */ () => {
-      validated("#specForm");
-      $("#jsonText").value = JSON.stringify(spec, null, 2);
-      $("#presetId").value = "";
-      $("#presetDisplayName").value = "";
-      $("#presetPurpose").value = "";
-      tab("json");
-      $("#presetId").focus();
-    },
-  );
-  /* JSON欄を解析してプレビューAPIで検証し、正規化された設定を返す。JSON構文・API検証エラーは呼出側へ伝える。 */
-  async function fromJson(draft = readPresetJson($("#jsonText").value), compact = false) {
-    const preview = await api("/api/preview", draft);
-    return compact ? preview.compact_spec : preview.validated_spec;
-  }
-  action(
-    "#applyJson",
-    /* JSONから検証済み設定を取得してフォームへ反映する。実行開始や保存は別操作とする。 */ async () => {
-      spec = await fromJson();
+  const presetEditor = window.FactoryPresetEditor;
+  presetEditor.configure({
+    capture: () => copy(spec),
+    apply: (value) => {
+      spec = value;
       render();
       tab("generate");
-      notice("JSONを検証し画面へ反映しました。");
+      notice("プリセットの設定を反映しました。");
     },
-  );
-  action(
-    "#savePreset",
-    /* プリセットIDの文字種と長さを確認し、検証済みJSONを保存する。成功後は一覧とフォームを更新する。 */ async () => {
-      const id = $("#presetId").value;
-      if (!/^[A-Za-z0-9_-]{1,64}$/.test(id))
-        throw new Error("プリセットIDを確認してください");
-      const draft = readPresetJson($("#jsonText").value);
-      const displayName = $("#presetDisplayName").value.trim();
-      const purpose = $("#presetPurpose").value.trim();
-      if (displayName) draft.name = displayName;
-      if (purpose) draft.description = purpose;
-      spec = await fromJson(draft);
-      await api("/api/presets/" + id, spec);
-      $("#jsonText").value = JSON.stringify(spec, null, 2);
-      await refresh();
-      $("#presetSelect").value = id;
-      description();
-      render();
-      notice("プリセットを保存しました。");
-    },
-  );
-  action(
-    "#exportJson",
-    /* JSON欄の検証済み設定を指定IDのファイル名でダウンロードする。 */ async () =>
-      download(await fromJson(undefined, $("#compactExport").checked), $("#presetId").value + ".json"),
-  );
-  $("#importJson").onchange =
-    /* 選択ファイルの2MiB制限を確認してJSON欄へ読み込み、サーバー検証後にフォームへ反映する。失敗は通知し、保存はしない。 */ async (
-      e,
-    ) => {
-      try {
-        const file = e.target.files[0];
-        if (file.size > 2 * 1024 ** 2) throw new Error("JSONは2MiB以下です");
-        $("#jsonText").value = await file.text();
-        spec = await fromJson();
-        render();
-        notice("JSONを読み込みました。");
-      } catch (err) {
-        notice(err.message, true);
-      }
-    };
+    refresh,
+    connectionUrl: "/api/profiles",
+  });
+  action("#toJson", () => {
+    validated("#specForm");
+    if (presetEditor.open(spec)) tab("json");
+  });
+  action("#editSelectedPreset", () => {
+    const id = $("#presetSelect").value;
+    if (id && presetEditor.open(null, { id })) tab("json");
+  });
   action(
     "#newProfile",
     /* スキーマ初期値から新しい編集用プロファイルを作る。時刻ベースのIDを与えるが、この時点ではサーバーに保存しない。 */ () => {
@@ -841,7 +796,6 @@ async function init() {
       notice(result.name + " を権限600で配置しました。");
     },
   );
-  $("#jsonText").value = JSON.stringify(spec, null, 2);
   await monitor();
   setInterval(
     /* 2秒ごとに状態取得を試みる。監視失敗はここで抑え、次周期に再試行する。重複実行の排他制御は持たない。 */ () =>
