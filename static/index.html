@@ -4,17 +4,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Factory Source Studio</title>
+    <title>ログ / Syslog 発生器</title>
     <link rel="stylesheet" href="/static/style.css" />
     <link rel="stylesheet" href="/static/help.css" />
     <script src="/static/comparison.js" defer></script>
     <script src="/static/api-client.js" defer></script>
+    <link rel="stylesheet" href="/static/preset-editor.css" />
+    <script src="/static/preset-editor-config.js" defer></script>
+    <script src="/static/preset-editor.js" defer></script>
     <script src="/static/app.js" defer></script>
   </head>
   <body>
     <header>
       <div>
-        <h1 id="title">ログをつくる</h1>
+        <h1 id="title">ログ / Syslog 発生器</h1>
         <p>検証用のログをつくり、ファイルに保存するかSyslogで送信します。</p>
       </div>
       <span id="status" class="badge">読み込み中</span>
@@ -26,7 +29,7 @@
           <button data-tab="generate" class="nav active">データをつくる</button
           ><button data-tab="profiles" class="nav">
             公開・出力設定</button
-          ><button data-tab="json" class="nav">設定の保存・JSON</button
+          ><button data-tab="json" class="nav">プリセットを編集</button
           ><button data-tab="monitor" class="nav">実行状況・取得方法</button>
           <button class="nav" type="button" data-tab="comparison">見本を比較</button>
         </nav>
@@ -51,6 +54,7 @@
             <div class="toolbar">
               <label>ひな型（プリセット）<select id="presetSelect"></select></label>
               <button id="loadPreset" type="button">ひな型を読み込む</button>
+              <button id="editSelectedPreset" type="button">プリセットを編集</button>
             </div>
             <div class="preset-scenario">
               <strong>どんな状況のひな型か</strong>
@@ -134,47 +138,8 @@
           </details>
         </section>
         <section id="json" class="tab">
-          <h2>プリセットJSON</h2>
-          <div class="card">
-            <section id="presetMetadata" aria-label="ひな型を保存">
-              <h3>ひな型を保存</h3>
-              <p class="muted">新しく保存するときは、既存のひな型と異なるIDを使います。</p>
-              <div class="preset-metadata-fields">
-                <div class="control"><label for="presetId">プリセットID</label>
-                  <input id="presetId" maxlength="64" placeholder="my-preset" />
-                </div>
-                <div class="control"><label for="presetDisplayName">ひな型の表示名（任意）</label>
-                  <input id="presetDisplayName" maxlength="120" placeholder="今の名前を使う場合は空欄" />
-                </div>
-              </div>
-              <label for="presetPurpose">想定する状況（任意）</label>
-              <textarea id="presetPurpose" maxlength="1000" rows="2" placeholder="何を試すのか、結果のどこを見るのか"></textarea>
-              <button id="savePreset" class="primary" type="button">ひな型として保存</button>
-            </section>
-            <label
-              >JSONファイルを読み込む<input
-                id="importJson"
-                type="file"
-                accept=".json,application/json" /></label
-            ><label
-              data-help="生成条件と設定を完全なJSONで編集。認証情報は別のプロファイルに保存します。"
-              >設定JSON<textarea
-                id="jsonText"
-                rows="28"
-                spellcheck="false"
-                class="code"
-              ></textarea>
-            </label>
-            <div class="actionbar">
-              <button id="applyJson">JSONを画面へ反映</button>
-              <label class="checkline">
-                <input type="checkbox" id="compactExport" checked />
-                既定値を省略
-              </label>
-              <button id="exportJson">JSONを書き出す</button>
-              <a class="help-entry" href="/help/templates.html">JSONの書き方</a>
-            </div>
-          </div>
+          <h2>プリセットを編集</h2>
+          <div id="presetEditor"></div>
         </section>
         <section id="monitor" class="tab">
           <h2>現在値と取得方法</h2>
